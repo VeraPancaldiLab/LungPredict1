@@ -1,0 +1,54 @@
+---
+title: "Enrichment TFs"
+output: html_document
+date: '2023-04-24'
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Datasets
+```{r}
+dataset = "LungPredict"
+dataset = "VanIP"
+dataset = "Vanderbilt"
+dataset = "Response"
+dataset = "Melanoma"
+dataset = "Immucan"
+dataset = "TCGA"
+```
+
+Input files
+```{r}
+module_TFs = readRDS(paste0(getwd(), "/Output/WGCNA/TFs_modules_", dataset))
+```
+
+Enrichment analysis
+```{r}
+###Setting universe
+data("dorothea_hs", package = "dorothea")
+regulons <- dorothea_hs %>%
+    filter(confidence %in% c("A", "B", "C", "D", "E"))
+#universe = c(regulons$tf, regulons$target)  
+universe = unique(regulons$tf)
+universeID = gconvert(universe, organism = "hsapiens", target = "ENTREZGENE_ACC", filter_na = T, mthreshold = 1)
+
+#Enrichment modules
+module_enrich = list()
+mod = c(2,6,7,10,11) #Modules number LungPredict
+for (i in mod){
+  entrezID = gconvert(module_TFs[[i]], organism = "hsapiens", target = "ENTREZGENE_ACC", filter_na = T, mthreshold = 1)
+  kegg_results = enrichKEGG(gene = entrezID$target, organism = "hsa", universe = universeID$target,pvalueCutoff = 0.05, pAdjustMethod = "BH")
+  module_enrich[[i]] = as.data.frame(kegg_results)
+  if(nrow(module_enrich[[i]])!=0){
+    png(paste0(getwd(),"/Figures/WGCNA/LungPredict/Module ",i, "_",dataset, ".png"), width = 1500, height = 1000, res=100)
+    print(dotplot(kegg_results))
+    dev.off()
+  }
+}
+
+```
+

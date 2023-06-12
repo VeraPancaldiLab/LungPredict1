@@ -1,0 +1,78 @@
+---
+title: "Signatures"
+author: "Marcelo Hurtado"
+date: "2023-02-15"
+output: html_document
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Input files
+```{r}
+til10_types <- read.delim(paste0(getwd(),"/Signatures/til10_types.txt"), row.names = 1)
+bprnacan3dProMet_types <- read.delim(paste0(getwd(),"/Signatures/bprnacan3dProMet_types.txt"), row.names = 1)
+bprnacan_types <- read.delim(paste0(getwd(),"/Signatures/bprnacan_types.txt"), row.names = 1)
+bprnacanProMet_types <- read.delim(paste0(getwd(),"/Signatures/bprnacanProMet_types.txt"), row.names = 1)
+CBX_hnscc_types <- read.delim(paste0(getwd(),"/Signatures/CBX_hnscc_types.txt"), row.names = 1)
+CBX_LM22_types <- read.delim(paste0(getwd(),"/Signatures/CBX_LM22_types.txt"), row.names = 1)
+CBX_melanoma_types <- read.delim(paste0(getwd(),"/Signatures/CBX_melanoma_types.txt"), row.names = 1)
+CBX_nslcc_types <- read.delim(paste0(getwd(),"/Signatures/CBX_nslcc_types.txt"), row.names = 1)
+```
+
+```{r}
+signatures_genes = function(signature, file_name){
+  #signature = bprnacan_types
+  signature$name = NA
+  signature[,2][grep("B", signature[,1])] = "B cells"
+  signature[,2][grep("endritic", signature[,1])] = "Dendritic cells"
+  signature[,2][grep("acrophages", signature[,1])] = "Macrophages cells"    
+  signature[,2][grep("M0", signature[,1])] = "M0 cells"
+  signature[,2][grep("M1", signature[,1])] = "M1 cells"
+  signature[,2][grep("M2", signature[,1])] = "M2 cells"
+  signature[,2][grep("Mono", signature[,1])] = "Mono cells"
+  signature[,2][grep("Neu", signature[,1])] = "Neutrophils cells"
+  signature[,2][grep("NK", signature[,1])] = "NK cells"
+  signature[,2][grep("NKT", signature[,1])] = "NKT cells"
+  signature[,2][grep("activated", signature[,1])] = "NK cells activated"
+  signature[,2][grep("resting", signature[,1])] = "NK cells resting"
+  signature[,2][grep("CD4", signature[,1])] = "CD4 cells"
+  signature[,2][grep("CD8", signature[,1])] = "CD8 cells"
+  signature[,2][grep("ancer", signature[,1])] = "Cancer cells"
+  signature[,2][grep("CAF", signature[,1])] = "CAF cells"
+  signature[,2][grep("ndothelial", signature[,1])] = "Endothelial cells"
+  
+  celltypes = c("B cells", "Dendritic cells", "Macrophages cells", "M0 cells", "M1 cells", "M2 cells", "Mono cells", "Neutrophils cells", "NK cells", "NKT cells", "NK cells activated","NK cells resting", "CD4 cells", "CD8 cells", "Cancer cells", "CAF cells", "Endothelial cells") 
+  genes = list()
+  indice = 1
+  
+  for(i in celltypes){
+    genes[[indice]] = rownames(signature)[which(signature[,2]==i)]
+    names(genes)[indice] = i
+    indice = indice + 1
+    
+  }
+  
+  saveRDS(genes, paste0(getwd(),"/Signatures/CellTypes_", file_name, ".rds"))
+  
+  return(genes)
+}
+
+
+```
+
+```{r}
+genes_til10 = signatures_genes(til10_types, "TIL10")
+genes_bprnacan3dProMet = signatures_genes(bprnacan3dProMet_types, "BPRNACan3DProMet")
+genes_bprnacan = signatures_genes(bprnacan_types, "BPRNACan")
+genes_bprnacanProMet = signatures_genes(bprnacanProMet_types, "BPRNACanProMet")
+genes_CBX_hnscc = signatures_genes(CBX_hnscc_types, "HNSCC")
+genes_CBX_LM22 = signatures_genes(CBX_LM22_types, "LM22")
+genes_CBX_melanoma = signatures_genes(CBX_melanoma_types, "Melanoma")
+genes_CBX_nslcc = signatures_genes(CBX_nslcc_types, "NSLCC")
+```
+
+

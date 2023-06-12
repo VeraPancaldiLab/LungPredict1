@@ -1,0 +1,51 @@
+"","Sample","Response","Time","id","Cohort","sizeFactor","replaceable"
+"Gide_PD1_10_Post","Gide_PD1_10_Post","Non responders","Post","ERR2208928","Gide",0.862000996708771,TRUE
+"Gide_PD1_10_Pre","Gide_PD1_10_Pre","Non responders","Pre","ERR2208929","Gide",0.821349194206668,TRUE
+"Gide_PD1_11_Pre","Gide_PD1_11_Pre","Non responders","Pre","ERR2208930","Gide",0.750622987499778,TRUE
+"Gide_PD1_12_Pre","Gide_PD1_12_Pre","Non responders","Pre","ERR2208931","Gide",1.10730156729754,TRUE
+"Gide_PD1_13_Post","Gide_PD1_13_Post","Non responders","Post","ERR2208932","Gide",0.998363984748553,TRUE
+"Gide_PD1_13_Pre","Gide_PD1_13_Pre","Non responders","Pre","ERR2208933","Gide",0.837010255703566,TRUE
+"Gide_PD1_14_Pre","Gide_PD1_14_Pre","Non responders","Pre","ERR2208934","Gide",0.913456997602339,TRUE
+"Gide_PD1_15_Pre","Gide_PD1_15_Pre","Non responders","Pre","ERR2208935","Gide",0.945183098359808,TRUE
+"Gide_PD1_16_Pre","Gide_PD1_16_Pre","Non responders","Pre","ERR2208936","Gide",0.845321198595361,TRUE
+"Gide_PD1_17_Post","Gide_PD1_17_Post","Non responders","Post","ERR2208937","Gide",3.19618605319074,TRUE
+"Gide_PD1_17_Pre","Gide_PD1_17_Pre","Non responders","Pre","ERR2208938","Gide",0.942421829196642,TRUE
+"Gide_PD1_18_Pre","Gide_PD1_18_Pre","Non responders","Pre","ERR2208939","Gide",1.02762284655113,TRUE
+"Gide_PD1_19_Pre","Gide_PD1_19_Pre","Non responders","Pre","ERR2208940","Gide",0.917822181709318,TRUE
+"Gide_PD1_2_Pre","Gide_PD1_2_Pre","Non responders","Pre","ERR2208941","Gide",0.921980668017959,TRUE
+"Gide_PD1_21_Pre","Gide_PD1_21_Pre","Non responders","Pre","ERR2208942","Gide",0.964393952827393,TRUE
+"Gide_PD1_23_Pre","Gide_PD1_23_Pre","Non responders","Pre","ERR2208943","Gide",0.846952482142887,TRUE
+"Gide_PD1_25_Post","Gide_PD1_25_Post","Responders","Post","ERR2208944","Gide",0.870358055893716,TRUE
+"Gide_PD1_25_Pre","Gide_PD1_25_Pre","Responders","Pre","ERR2208945","Gide",1.02874621812343,TRUE
+"Gide_PD1_27_Pre","Gide_PD1_27_Pre","Responders","Pre","ERR2208946","Gide",0.850736071540572,TRUE
+"Gide_PD1_29_Post","Gide_PD1_29_Post","Non responders","Post","ERR2208947","Gide",0.901974967360789,TRUE
+"Gide_PD1_29_Pre","Gide_PD1_29_Pre","Non responders","Pre","ERR2208948","Gide",0.956679661224916,TRUE
+"Gide_PD1_3_Pre","Gide_PD1_3_Pre","Non responders","Pre","ERR2208949","Gide",0.848030806972449,TRUE
+"Gide_PD1_30_Pre","Gide_PD1_30_Pre","Non responders","Pre","ERR3262563","Gide",3.14951508354536,TRUE
+"Gide_PD1_34_Pre","Gide_PD1_34_Pre","Responders","Pre","ERR2208951","Gide",0.902142439420244,TRUE
+"Gide_PD1_35_Pre","Gide_PD1_35_Pre","Responders","Pre","ERR2208952","Gide",0.772963618882344,TRUE
+"Gide_PD1_36_Pre","Gide_PD1_36_Pre","Responders","Pre","ERR2208953","Gide",0.776496765668894,TRUE
+"Gide_PD1_38_Pre","Gide_PD1_38_Pre","Responders","Pre","ERR2208954","Gide",0.956548809223765,TRUE
+"Gide_PD1_4_Pre","Gide_PD1_4_Pre","Non responders","Pre","ERR3262564","Gide",2.73072328740348,TRUE
+"Gide_PD1_40_Pre","Gide_PD1_40_Pre","Responders","Pre","ERR2208956","Gide",0.993403188126744,TRUE
+"Gide_PD1_41_Post","Gide_PD1_41_Post","Responders","Post","ERR2208957","Gide",0.836936047473498,TRUE
+"Gide_PD1_41_Pre","Gide_PD1_41_Pre","Responders","Pre","ERR2208958","Gide",0.89887214907738,TRUE
+"Gide_PD1_42_Pre","Gide_PD1_42_Pre","Responders","Pre","ERR2208959","Gide",0.864683546345037,TRUE
+"Gide_PD1_44_Pre","Gide_PD1_44_Pre","Responders","Pre","ERR2208960","Gide",0.904759610548467,TRUE
+"Gide_PD1_45_Pre","Gide_PD1_45_Pre","Responders","Pre","ERR2208961","Gide",0.858563597758132,TRUE
+"Gide_PD1_46_Pre","Gide_PD1_46_Pre","Responders","Pre","ERR2208962","Gide",0.911459129241237,TRUE
+"Gide_PD1_47_Post","Gide_PD1_47_Post","Responders","Post","ERR2208963","Gide",0.793053397899589,TRUE
+"Gide_PD1_47_Pre","Gide_PD1_47_Pre","Responders","Pre","ERR2208964","Gide",0.917434920614604,TRUE
+"Gide_PD1_48_Post","Gide_PD1_48_Post","Responders","Post","ERR2208965","Gide",0.720956122360642,TRUE
+"Gide_PD1_48_Pre","Gide_PD1_48_Pre","Responders","Pre","ERR2208966","Gide",0.934168620692398,TRUE
+"Gide_PD1_49_Pre","Gide_PD1_49_Pre","Responders","Pre","ERR2208967","Gide",0.913625472805192,TRUE
+"Gide_PD1_5_Pre","Gide_PD1_5_Pre","Non responders","Pre","ERR2208968","Gide",0.773153104596027,TRUE
+"Gide_PD1_50_Pre","Gide_PD1_50_Pre","Responders","Pre","ERR2208969","Gide",0.807728506313101,TRUE
+"Gide_PD1_52_Pre","Gide_PD1_52_Pre","Responders","Pre","ERR2208970","Gide",0.869587424961196,TRUE
+"Gide_PD1_53_Pre","Gide_PD1_53_Pre","Responders","Pre","ERR2208971","Gide",0.787926285514162,TRUE
+"Gide_PD1_54_Pre","Gide_PD1_54_Pre","Responders","Pre","ERR2208972","Gide",0.758333253579377,TRUE
+"Gide_PD1_6_Pre","Gide_PD1_6_Pre","Non responders","Pre","ERR2208973","Gide",0.857302881568978,TRUE
+"Gide_PD1_7_Pre","Gide_PD1_7_Pre","Non responders","Pre","ERR2208974","Gide",0.881904867350542,TRUE
+"Gide_PD1_8_Post","Gide_PD1_8_Post","Non responders","Post","ERR2208975","Gide",3.80024941961787,TRUE
+"Gide_PD1_8_Pre","Gide_PD1_8_Pre","Non responders","Pre","ERR3262565","Gide",2.64091852033705,TRUE
+"Gide_PD1_9_Pre","Gide_PD1_9_Pre","Non responders","Pre","ERR2208977","Gide",0.907525457653507,TRUE

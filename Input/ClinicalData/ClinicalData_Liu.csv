@@ -1,0 +1,122 @@
+"","Sample","Response","Time","sizeFactor","replaceable"
+"Patient1","Patient1","Non responders","Pre",1.19678493878289,TRUE
+"Patient10","Patient10","Responders","Pre",1.31565612632198,TRUE
+"Patient100","Patient100","Responders","Pre",0.479199152832037,TRUE
+"Patient102","Patient102","Non responders","Pre",1.22841726551345,TRUE
+"Patient105","Patient105","Non responders","Pre",1.9055292398037,TRUE
+"Patient106","Patient106","Responders","Pre",1.31213084687392,TRUE
+"Patient107","Patient107","Responders","Pre",0.0537131691317547,TRUE
+"Patient108","Patient108","Non responders","Pre",0.481275649627645,TRUE
+"Patient11","Patient11","Non responders","Pre",0.847099573505878,TRUE
+"Patient112","Patient112","Non responders","Pre",0.372146021087925,TRUE
+"Patient116","Patient116","Non responders","Pre",1.55890014995644,TRUE
+"Patient117","Patient117","Non responders","Pre",1.30809577662824,TRUE
+"Patient121","Patient121","Responders","Pre",0.993000316957228,TRUE
+"Patient125","Patient125","Responders","Pre",1.19754134572687,TRUE
+"Patient126","Patient126","Responders","Pre",1.57236053141207,TRUE
+"Patient127","Patient127","Responders","Pre",0.886414555335582,TRUE
+"Patient13","Patient13","Non responders","Pre",1.66293986295848,TRUE
+"Patient130","Patient130","Non responders","Pre",0.807506016251703,TRUE
+"Patient131","Patient131","Responders","Pre",0.931802551391323,TRUE
+"Patient132","Patient132","Responders","Pre",0.951648110951581,TRUE
+"Patient133","Patient133","Non responders","Pre",1.44662559920874,TRUE
+"Patient134","Patient134","Non responders","Pre",1.71953583639295,TRUE
+"Patient135","Patient135","Responders","Pre",1.49699750265246,TRUE
+"Patient137","Patient137","Responders","Pre",0.936656286967152,TRUE
+"Patient14","Patient14","Non responders","Pre",0.940809071272096,TRUE
+"Patient140","Patient140","Non responders","Pre",1.72546086452034,TRUE
+"Patient141","Patient141","Responders","Pre",1.153756419698,TRUE
+"Patient142","Patient142","Non responders","Pre",2.37115857471301,TRUE
+"Patient143","Patient143","Non responders","Pre",0.0316885757056871,TRUE
+"Patient144","Patient144","Responders","Pre",1.61794166843842,TRUE
+"Patient145","Patient145","Responders","Pre",1.7106900438256,TRUE
+"Patient146","Patient146","Responders","Pre",0.715520597184986,TRUE
+"Patient147","Patient147","Responders","Pre",1.06078834552895,TRUE
+"Patient148","Patient148","Responders","Pre",1.19606812130888,TRUE
+"Patient149","Patient149","Non responders","Pre",1.82734153663877,TRUE
+"Patient15","Patient15","Responders","Pre",0.815440927238806,TRUE
+"Patient150","Patient150","Responders","Pre",1.39608489237902,TRUE
+"Patient154","Patient154","Non responders","Pre",0.968528499993105,TRUE
+"Patient155","Patient155","Non responders","Pre",0.849144511483896,TRUE
+"Patient156","Patient156","Non responders","Pre",2.05194853135285,TRUE
+"Patient158","Patient158","Responders","Pre",0.940037459183669,TRUE
+"Patient159","Patient159","Non responders","Pre",1.70892796341738,TRUE
+"Patient162","Patient162","Non responders","Pre",0.732189238795773,TRUE
+"Patient163","Patient163","Non responders","Pre",1.25980630607593,TRUE
+"Patient165","Patient165","Non responders","Pre",2.20958700837204,TRUE
+"Patient166","Patient166","Responders","Pre",1.22009162357835,TRUE
+"Patient167","Patient167","Non responders","Pre",2.39789617244054,TRUE
+"Patient168","Patient168","Responders","Pre",1.83966330965908,TRUE
+"Patient169","Patient169","Responders","Pre",2.34064676168808,TRUE
+"Patient17","Patient17","Non responders","Pre",0.700728023887531,TRUE
+"Patient170","Patient170","Non responders","Pre",0.74717703032829,TRUE
+"Patient172","Patient172","Non responders","Pre",3.2969887158139,TRUE
+"Patient173","Patient173","Non responders","Pre",1.51899119527916,TRUE
+"Patient179","Patient179","Responders","Pre",0.258409152398757,TRUE
+"Patient18","Patient18","Non responders","Pre",1.34613327251275,TRUE
+"Patient181","Patient181","Responders","Pre",1.53953734523604,TRUE
+"Patient183","Patient183","Non responders","Pre",0.829605874324296,TRUE
+"Patient184","Patient184","Responders","Pre",0.427826275666762,TRUE
+"Patient185","Patient185","Non responders","Pre",1.53676417777498,TRUE
+"Patient187","Patient187","Responders","Pre",0.99184145117351,TRUE
+"Patient188","Patient188","Non responders","Pre",1.3994166199238,TRUE
+"Patient189","Patient189","Responders","Pre",0.917602025080865,TRUE
+"Patient191","Patient191","Responders","Pre",1.7823036277663,TRUE
+"Patient193","Patient193","Non responders","Pre",1.72347989036064,TRUE
+"Patient195","Patient195","Responders","Pre",1.39852123615088,TRUE
+"Patient196","Patient196","Non responders","Pre",1.2108896871007,TRUE
+"Patient197","Patient197","Responders","Pre",0.993432234512794,TRUE
+"Patient20","Patient20","Non responders","Pre",0.983226312971365,TRUE
+"Patient200","Patient200","Non responders","Pre",1.12687414294763,TRUE
+"Patient201","Patient201","Non responders","Pre",0.275221696352683,TRUE
+"Patient203","Patient203","Non responders","Pre",1.14213182748289,TRUE
+"Patient204","Patient204","Responders","Pre",1.01221437569955,TRUE
+"Patient205","Patient205","Non responders","Pre",0.590807484066533,TRUE
+"Patient206","Patient206","Non responders","Pre",0.954552176180765,TRUE
+"Patient21","Patient21","Responders","Pre",0.868456077170997,TRUE
+"Patient22","Patient22","Non responders","Pre",0.956781428829959,TRUE
+"Patient23","Patient23","Non responders","Pre",1.25356687171032,TRUE
+"Patient24","Patient24","Non responders","Pre",0.553709386830796,TRUE
+"Patient25","Patient25","Responders","Pre",1.35603972823132,TRUE
+"Patient27","Patient27","Non responders","Pre",1.32975049931102,TRUE
+"Patient30","Patient30","Non responders","Pre",0.504848845894334,TRUE
+"Patient31","Patient31","Non responders","Pre",1.18522095631079,TRUE
+"Patient32","Patient32","Non responders","Pre",1.27676199252103,TRUE
+"Patient33","Patient33","Responders","Pre",1.22299020791537,TRUE
+"Patient34","Patient34","Responders","Pre",0.719269144255385,TRUE
+"Patient35","Patient35","Non responders","Pre",0.501381690802015,TRUE
+"Patient36","Patient36","Non responders","Pre",1.58738841861355,TRUE
+"Patient37","Patient37","Non responders","Pre",1.09198972321719,TRUE
+"Patient38","Patient38","Non responders","Pre",1.00046804564285,TRUE
+"Patient4","Patient4","Responders","Pre",1.2255622008504,TRUE
+"Patient40","Patient40","Non responders","Pre",1.25866871373097,TRUE
+"Patient42","Patient42","Responders","Pre",0.626895574102812,TRUE
+"Patient44","Patient44","Responders","Pre",0.35660264238436,TRUE
+"Patient45","Patient45","Responders","Pre",0.764492421508808,TRUE
+"Patient47","Patient47","Non responders","Pre",1.04485061543656,TRUE
+"Patient48","Patient48","Non responders","Pre",0.572026787798468,TRUE
+"Patient51","Patient51","Responders","Pre",0.42358660710654,TRUE
+"Patient56","Patient56","Non responders","Pre",1.4610852789939,TRUE
+"Patient58","Patient58","Non responders","Pre",0.587388874243884,TRUE
+"Patient6","Patient6","Non responders","Pre",1.4915536578587,TRUE
+"Patient61","Patient61","Non responders","Pre",0.0628153720096315,TRUE
+"Patient62","Patient62","Responders","Pre",1.76944218767503,TRUE
+"Patient63","Patient63","Non responders","Pre",1.11193797568113,TRUE
+"Patient67","Patient67","Non responders","Pre",0.581230849304789,TRUE
+"Patient7","Patient7","Non responders","Pre",1.84047894543166,TRUE
+"Patient72","Patient72","Non responders","Pre",1.53260853193144,TRUE
+"Patient73","Patient73","Non responders","Pre",1.26911855271371,TRUE
+"Patient75","Patient75","Responders","Pre",0.243740253189321,TRUE
+"Patient77","Patient77","Non responders","Pre",1.5272859683105,TRUE
+"Patient78","Patient78","Non responders","Pre",1.24683298686795,TRUE
+"Patient79","Patient79","Non responders","Pre",1.07764769650216,TRUE
+"Patient8","Patient8","Non responders","Pre",1.47801948336827,TRUE
+"Patient82","Patient82","Non responders","Pre",1.32854778656168,TRUE
+"Patient83","Patient83","Non responders","Pre",1.10497730929252,TRUE
+"Patient86","Patient86","Non responders","Pre",1.01541786375283,TRUE
+"Patient87","Patient87","Responders","Pre",0.865720498539099,TRUE
+"Patient9","Patient9","Non responders","Pre",1.61945091116305,TRUE
+"Patient94","Patient94","Non responders","Pre",1.72946305237122,TRUE
+"Patient96","Patient96","Responders","Pre",1.52102282982041,TRUE
+"Patient98","Patient98","Non responders","Pre",1.7769620186039,TRUE
+"Patient99","Patient99","Responders","Pre",0.984794855311478,TRUE

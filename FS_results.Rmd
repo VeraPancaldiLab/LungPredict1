@@ -1,0 +1,64 @@
+---
+title: "Correlation_results"
+author: "Marcelo Hurtado"
+date: '2023-01-21'
+output: html_document
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Datasets
+```{r}
+dataset = "LungPredict"
+dataset = "VanIP"
+dataset = "Vanderbilt"
+dataset = "Response"
+dataset = "Melanoma"
+dataset = "Immucan"
+dataset = "TCGA"
+dataset = "Liu"
+```
+
+Input files 
+```{r}
+clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+
+#Lung Predict and VanIP only
+METASTASIS <- read.csv(paste0(getwd(), "/Output/Feature_Selection/Anova_metastasis_", dataset,".csv"), row.names=1)
+METASTASIS <- read.csv(paste0(getwd(), "/Output/Feature_Selection/Anova_metastasis_Features_", dataset,".csv"), row.names=1)
+
+STAGES <- read.csv(paste0(getwd(), "/Output/Feature_Selection/Anova_stages_", dataset,".csv"), row.names=1)
+
+#Melanoma and LP IP data only
+RESPONSE <- read.csv(paste0(getwd(), "/Output/Feature_Selection/Anova_response_Features_", dataset, ".csv"), row.names=1)
+```
+
+Violin plots
+```{r}
+idx = which(clinical.data$response=="No data")
+idx = which(clinical.data$Stages_simplified==c("II", "III"))
+clinical.data = clinical.data[-idx,]
+METASTASIS = METASTASIS[-idx,]
+RESPONSE = RESPONSE[-idx,]
+compute_violin(METASTASIS, clinical.data$Metastatic, paste0("Metastasis_",dataset))
+compute_violin(STAGES, clinical.data$Stages_simplified, paste0("Stages_",dataset))
+compute_violin(RESPONSE, clinical.data$Response, paste0("Response_",dataset))
+```
+
+```{r}
+all_deconvolutions_all_TCGA <- read.delim("~/Downloads/all_deconvolutions_all_TCGA.txt", row.names=1)
+all_deconvolutions_all_TCGA = all_deconvolutions_all_TCGA[rownames(all_deconvolutions_all_TCGA)%in%clinical$case_submitter_id,]
+clinical = clinical[clinical$ajcc_pathologic_stage,]
+
+colnames(METASTASIS)
+```
+
+```{r}
+METASTASIS = METASTASIS[,-c(12, 13, 14, 21, 28)]
+write.csv(METASTASIS, paste0(getwd(), "/Output/Feature_Selection/Anova_metastasis_", dataset,".csv"))
+```
+

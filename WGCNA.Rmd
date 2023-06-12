@@ -1,0 +1,276 @@
+---
+title: "WGCNA"
+author: "Marcelo Hurtado"
+date: '2023-02-15'
+output: html_document
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Datasets
+```{r}
+dataset = "LungPredict"
+dataset = "VanIP"
+dataset = "Vanderbilt"
+dataset = "Response"
+dataset = "Melanoma"
+dataset = "Immucan"
+dataset = "TCGA"
+dataset = "Liu"
+dataset = "LPVan"
+```
+
+Input files
+```{r}
+clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
+deconv <- read.csv(paste0(getwd(),"/Output/Deconvolution/Deconvolution_afterFS_", dataset, ".txt"), row.names = 1)
+#deconv <- read.csv(paste0(getwd(), "/Output/Feature_Selection/Anova_metastasis_", dataset,".csv"), row.names=1)
+```
+
+```{r}
+# Elbow method
+fviz_nbclust(TFs, kmeans, method = "wss") +
+  labs(subtitle = "Elbow method")
+
+# Silhouette method
+x = fviz_nbclust(TFs, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+
+# Gap statistic
+set.seed(123)
+fviz_nbclust(TFs, kmeans, nstart = 25,  method = "gap_stat", nboot = 1000)+
+  labs(subtitle = "Gap statistic method")
+
+x = NbClust(data = TFs, diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "ward.D2")
+
+kmeans.samples <- kmeans(TFs, centers = 4, nstart = 20)
+TFs$Cluster = kmeans.samples$cluster
+
+hc1 = as.dendrogram(hclust(dist(TFs), method = "ward.D2"))
+
+#Look for outliers
+SampleDist = dist(t(TFs))
+SampleDistMatrix = as.matrix(SampleDist)
+colors = colorRampPalette( rev(brewer.pal(9, "Purples")) )(255)
+pheatmap(SampleDistMatrix, clustering_distance_rows = SampleDist, clustering_distance_cols = SampleDist, col=colors)
+
+TFs = TFs[,-which(colnames(TFs))"Test.FFPE.08"]
+```
+
+```{r}
+TFs$Cluster = unlist(x$Best.partition)
+MEs0 <- moduleEigengenes(t(TFs[,1:ncol(TFs)-1]), TFs$Cluster)$eigengenes
+moduleTraitCor = cor(MEs0, coldata, use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(coldata))
+
+textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
+                  signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+  
+idx = which(moduleTraitPvalue>0.05)
+for (i in idx) {
+  textMatrix[i] = NA
+}
+
+d <- dist(t(moduleTraitCor), method = "euclidean")
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+  
+###Figure module-trait relationship
+png(paste0(getwd(),"/Figures/WGCNA/Module_trait_relationships_test", dataset, ".png"), width = 3500, height = 1500, res=150)
+par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
+labeledHeatmap(Matrix = moduleTraitCor[,vec],
+               xLabels = names(coldata[,vec]),
+               yLabels = colnames(MEs0),
+               ySymbols = colnames(MEs0),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix[,vec],
+               setStdMargins = FALSE,
+               cex.text = 0.8,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+```
+
+```{r}
+vec = c("Mono_LungPredict_Subgroup_6","Macrophages_LungPredict_Subgroup_1_2", "Mono_LungPredict_Subgroup_3_9", "CD8_LungPredict_Subgroup_10", "M0_LungPredict_Subgroup_2_3")
+deconv = deconv[,-which(colnames(deconv)%in%vec)]
+
+vec = "Cancer_Vanderbilt_Subgroup_2"
+deconv = deconv[,-which(colnames(deconv)%in%vec)]
+```
+
+WGCNA analysis
+```{r}
+###Input files
+data = t(TFs) #--> rows samples and genes as columns
+#coldata = deconv[1:nrow(deconv)-1,]
+coldata = deconv
+
+###Choose Soft Threshold (power) parameter
+powers = c(c(1:10), seq(from = 12, to = 20, by = 2))
+sft = pickSoftThreshold(data, powerVector = powers, verbose = 5)
+print(plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+    xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+    main = paste("Scale independence")))
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], labels=powers,cex=0.9,col="red")
+abline(h=0.90,col="red")
+
+###Compute WGCNA modules
+cor <- WGCNA::cor
+picked_power = 12
+netwk <- blockwiseModules(data,
+                          power = picked_power,
+                          networkType = "signed",
+                          deepSplit = 2,
+                          pamRespectsDendro = F,
+                          minModuleSize = 5,
+                          reassignThreshold = 0,
+                          mergeCutHeight = 0.15,
+                          numericLabels = T,
+                          verbose = 3)
+mergedColors = labels2colors(netwk$colors)
+module_df <- data.frame(gene_id = names(netwk$colors),
+                        colors = paste0("ME", labels2colors(netwk$colors))) 
+
+###Get Module eigengenes per cluster
+nGenes = ncol(data)
+nSamples = nrow(data)
+MEs0 <- moduleEigengenes(data, mergedColors)$eigengenes
+MEs0 <- orderMEs(MEs0)
+hubgenes = chooseTopHubInEachModule(data, mergedColors)
+module_order = names(MEs0) %>% gsub("ME","", .)
+MEs0$treatment = row.names(MEs0)
+MEs0$treatment = NULL  
+
+###Merge TFs modules
+height = 1.2 #Vanderbilt parameter
+d <- dist(t(MEs0), method = "euclidean")
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+clusters <- cutree(hc1, h = height)
+hc = as.dendrogram(hc1)
+avg_col_dend <- color_branches(hc, h = height)
+png(paste0(getwd(),"/Figures/WGCNA/Dendogram_Modules_TFs_", dataset, ".png"), width = 2500, height = 2500, res=150)
+par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
+plot(avg_col_dend, horiz= T)
+rect.dendrogram(avg_col_dend, h=height,horiz=TRUE)
+dev.off()
+
+MEs0_merge = MEs0 %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+
+####Save TFs of each module
+data = MEs0 %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = clusters) %>%
+  as.data.frame()
+
+rownames(data) = colnames(MEs0)
+
+modules_merged = list()
+for (i in 1:nrow(MEs0_merge)) {
+  idx = which(data$Cluster==i)
+  modules_merged[[i]] = module_df$gene_id[module_df$colors%in%rownames(data)[idx]]
+  names(modules_merged)[i] = paste0("Cluster ", i)
+}
+
+saveRDS(modules_merged, paste0(getwd(),"/Output/WGCNA/TFs_modules_", dataset)) ###TFs list from each module
+write.csv(MEs0_merge, paste0(getwd(),"/Output/WGCNA/Modules_TFs_", dataset, ".csv")) ###Output/scores modules
+```
+
+Relate results with features
+```{r}
+moduleTraitCor = cor(t(MEs0_merge), coldata, use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
+
+textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
+                  signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+  
+idx = which(moduleTraitPvalue>0.05)
+for (i in idx) {
+  textMatrix[i] = NA
+}
+
+d <- dist(t(moduleTraitCor), method = "euclidean")
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+  
+###Figure module-trait relationship
+png(paste0(getwd(),"/Figures/WGCNA/Module_trait_relationships_", dataset, ".png"), width = 3500, height = 1500, res=150)
+par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
+labeledHeatmap(Matrix = moduleTraitCor[,vec],
+               xLabels = names(coldata[,vec]),
+               yLabels = rownames(MEs0_merge),
+               ySymbols = rownames(MEs0_merge),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix[,vec],
+               setStdMargins = FALSE,
+               cex.text = 0.8,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+
+#Modules filtering 
+#1. Remove high correlate modules
+#2. Remove low correlated modules with features
+#3. Remove modules that contains unconnected TFs
+vec = c("Cluster 12", "Cluster 13", "Cluster 14", "Cluster 3", "Cluster 8", "Cluster 9", "Cluster 1", "Cluster 4", "CLuster 5") #Lung Predict
+vec = c("Cluster 1", "Cluster 8") #Vanderbilt
+
+MEs0_merge = MEs0_merge[-which(rownames(MEs0_merge)%in%vec),]
+```
+
+Identify cell niches
+```{r}
+#Extract clusters from dendogram
+height = 0.7
+clusters <- cutree(hc1, h = height, k = 8)
+hc = as.dendrogram(hc1)
+#saveRDS(hc, "dendogram_cells.rds")
+###Figure dendogram cell types based on TFs activity 
+png(paste0(getwd(),"/Figures/WGCNA/Dendogram_Subgroups_cells_", dataset, ".png"), width = 2500, height = 2500, res=150)
+par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
+plot(hc, horiz= T)
+rect.dendrogram(hc, h=0.6,horiz=TRUE)
+dev.off()
+
+###Immune cells niches based on TFs activity
+deconv_df = deconv %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+####Save cell types of each cluster
+data = deconv %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = clusters) %>%
+  as.data.frame()
+rownames(data) = colnames(deconv)
+niches = list()
+for (i in 1:nrow(deconv_df)) {
+  niches[[i]] = rownames(data)[which(data$Cluster==i)]
+}
+
+write.csv(deconv_df, paste0(getwd(),"/Output/DataIntegration/Features_integrated_", dataset, ".csv"))
+saveRDS(niches, paste0(getwd(),"/Output/DataIntegration/Immune_niches_", dataset)) 
+```
+

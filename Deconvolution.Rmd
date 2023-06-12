@@ -1,0 +1,233 @@
+---
+title: "DeconvSelection"
+author: "Marcelo Hurtado"
+date: "2022-11-21"
+output: html_document
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Datasets
+```{r}
+dataset = "LungPredict"
+dataset = "VanIP"
+dataset = "Vanderbilt"
+dataset = "Response"
+dataset = "Melanoma"
+dataset = "Immucan"
+dataset = "TCGA"
+dataset = "Liu"
+dataset = "Riaz"
+dataset = "Gide"
+dataset = "LPVan"
+
+```
+
+Input files
+```{r}
+#Input files
+deconv <- as.matrix(read.csv(paste0(getwd(),"/Input/Deconvolution/Deconvolution_", dataset, ".csv"), row.names = 1))
+clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+#clinical.data = clinical.data[clinical.data$histology_WHO=="Adenocarcinoma",]
+#deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
+#idx = which(clinical.data$stage == c("IA", "IB"))
+#clinical.data$stage[idx] = "I" 
+
+```
+
+Batch effect
+```{r}
+
+compute_pca_analysis(t(deconv), clinical.data, 6, paste0("Deconvolution_",dataset)) #PCA analysis
+
+p <- pca(t(deconv), clinical.data, removeVar = 0.1)
+  
+peigencor  <- eigencorplot(p,
+                             components = getComponents(p, 1:6),
+                             metavars = colnames(clinical.data),
+                             col = c('white', 'cornsilk1', 'gold', 'forestgreen', 'darkgreen'),
+                             cexCorval = 1.2,
+                             fontCorval = 2,
+                             posLab = 'all',
+                             rotLabX = 45,
+                             scale = TRUE,
+                             main = bquote(Principal ~ component ~ Pearson ~ r^2 ~ clinical ~ correlates),
+                             plotRsquared = TRUE,
+                             corFUN = 'pearson',
+                             corUSE = 'pairwise.complete.obs',
+                             corMultipleTestCorrection = 'BH',
+                             signifSymbols = c('****', '***', '**', '*', ''),
+                             signifCutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 1))
+  
+png(paste0(getwd(),"/Figures/PCA/peigencor_", paste0("Deconvolution_",dataset), ".png"), width = 2500, height = 1500, res = 150)
+print(peigencor)
+dev.off()
+  
+p <- pca(t(deconv), metadata = clinical.data, removeVar = 0.1)
+pbiplot_loadings <- biplot(p, x = "PC1", y = "PC2",
+                             showLoadings = TRUE,
+                             lengthLoadingsArrowsFactor = 1.5,
+                             sizeLoadingsNames = 4,
+                             colLoadingsNames = 'red4',
+                             lab = NULL,
+                             colby = "Batch",
+                             hline = 0, vline = c(-25, 0, 25),
+                             vlineType = c('dotdash', 'solid', 'dashed'),
+                             gridlines.major = FALSE, gridlines.minor = FALSE,
+                             pointSize = 5,
+                             legendPosition = 'left', legendLabSize = 14, legendIconSize = 8.0,
+                             drawConnectors = FALSE,
+                             title = 'PCA loadings',
+                             subtitle = "PC1 versus PC2")
+
+png(paste0(getwd(),"/Figures/PCA/pbiplot_Batch_Deconvolution_", dataset, ".png"), width = 2000, height = 1500, res = 150)
+print(pbiplot_loadings)
+dev.off()
+
+#After batch effect removal
+deconv_dt <- limma::removeBatchEffect(t(deconv), batch=clinical.data$Batch) #Samples as columns
+
+p <- pca(deconv_dt, metadata = clinical.data, removeVar = 0.1)
+pbiplot_loadings <- biplot(p, x = "PC1", y = "PC2",
+                             showLoadings = TRUE,
+                             lengthLoadingsArrowsFactor = 1.5,
+                             sizeLoadingsNames = 4,
+                             colLoadingsNames = 'red4',
+                             lab = NULL,
+                             colby = "Batch",
+                             hline = 0, vline = c(-25, 0, 25),
+                             vlineType = c('dotdash', 'solid', 'dashed'),
+                             gridlines.major = FALSE, gridlines.minor = FALSE,
+                             pointSize = 5,
+                             legendPosition = 'left', legendLabSize = 14, legendIconSize = 8.0,
+                             drawConnectors = FALSE,
+                             title = 'PCA loadings after BE removal',
+                             subtitle = "PC1 versus PC2")
+
+png(paste0(getwd(),"/Figures/PCA/pbiplot_AfterBatch_Deconvolution_", dataset, ".png"), width = 2000, height = 1500, res = 150)
+print(pbiplot_loadings)
+dev.off()
+
+deconv = as.matrix(t(deconv_dt))
+```
+
+Remove deconvolution equal signatures 
+```{r}
+deconv <- deconv[,-grep("MCP", colnames(deconv))]
+```
+
+Unsupervised filtering
+```{r}
+#Remove columns variance = 0
+deconv = data.frame(deconv[,-which(colVars(deconv)<=summary(colVars(deconv))[2])])
+#Remove columns with more than 70% of zeros
+i <- colSums(deconv == 0, na.rm=TRUE) < round(0.7*nrow(deconv))
+deconv_df <- data.frame(deconv[, i, drop=FALSE])
+```
+
+Split by Cell types
+```{r}
+mat = compute_cell.types(deconv_df, dataset)
+```
+
+Subgrouping algorithm
+```{r}
+corr_thres = 0.8
+corr_if = 0.5
+iteration = 1000
+
+Bcells_filt = compute_subgroups(mat$Bcells, corr_thres, corr_if, iteration, paste0("B_",dataset))
+CD4_filt = compute_subgroups(mat$CD4cells, corr_thres, corr_if,iteration, paste0("CD4_",dataset))
+CD8_filt = compute_subgroups(mat$CD8cells, corr_thres, corr_if,iteration, paste0("CD8_",dataset))
+M1_filt = compute_subgroups(mat$M1cells, corr_thres, corr_if, iteration, paste0("M1_",dataset))
+M2_filt = compute_subgroups(mat$M2cells, corr_thres, corr_if, iteration, paste0("M2_",dataset))
+NK_filt = compute_subgroups(mat$NKcells, corr_thres, corr_if, iteration, paste0("NK_",dataset))
+Cancer_filt = compute_subgroups(mat$Cancer, corr_thres, corr_if, iteration, paste0("Cancer_",dataset))
+Neutrophils_filt = compute_subgroups(mat$Neutrophils, corr_thres, corr_if, iteration, paste0("Neutrophils_",dataset))
+M0_filt = compute_subgroups(mat$M0cells, corr_thres, corr_if, iteration, paste0("M0_",dataset))
+Mono_filt = compute_subgroups(mat$Monocytes, corr_thres, corr_if, iteration, paste0("Mono_",dataset))
+CAF_filt = compute_subgroups(mat$CAF, corr_thres, corr_if, iteration, paste0("CAF_",dataset))
+Dendritic_filt = compute_subgroups(mat$Dendritic, corr_thres, corr_if, iteration, paste0("Dendritic_",dataset))
+Endothelial_filt = compute_subgroups(mat$Endothelial, corr_thres, corr_if, iteration, paste0("Endothelial_",dataset))
+Macrophages_filt = compute_subgroups(mat$Macrophages, corr_thres, corr_if, iteration, paste0("Macrophages_",dataset))
+```
+
+Save Output files
+```{r}
+deconv_df = data.frame(cbind(Bcells_filt[[1]] , CAF_filt[[1]], Cancer_filt[[1]], CD4_filt[[1]], CD8_filt[[1]],  M1_filt[[1]], M2_filt[[1]], 
+                             Mono_filt[[1]],  Neutrophils_filt[[1]],NK_filt[[1]], Dendritic_filt[[1]], Endothelial_filt[[1]], Macrophages_filt[[1]]))
+
+write.csv(deconv_df, paste0(getwd(),"/Output/Deconvolution/Deconvolution_afterFS_", dataset, ".txt"))
+png(paste0(getwd(),"/Figures/Corrplots/Corrplot_Deconvolution_afterFS_", dataset, ".png"), width = 2400, height = 1500, res=100)
+plot_correlation(t(deconv_df), paste0("Correlation deconvolution - ", dataset))
+dev.off()
+```
+Removing subgroups composed by same method only 
+```{r}
+celltypes = list(Bcells_filt[[2]] , CAF_filt[[2]], Cancer_filt[[2]], CD4_filt[[2]], CD8_filt[[2]],  M1_filt[[2]], M2_filt[[2]], 
+                             Mono_filt[[2]],  Neutrophils_filt[[2]], NK_filt[[2]], Dendritic_filt[[2]], Endothelial_filt[[2]], Macrophages_filt[[2]])
+
+for (pos in 1:length(celltypes)){
+  lis = c()
+  for (i in 1:length(celltypes[[pos]])) {
+    x = c()
+    for (j in 1:length(celltypes[[pos]][[i]])) {
+      x =  c(x,str_split(celltypes[[pos]][[i]], "_")[[j]][1])
+    }
+    if(length(unique(x)) == 1){
+      lis = c(lis, names(celltypes[[pos]])[[i]])
+    }
+  }
+  if(length(lis)>0){
+    celltypes[[pos]] = celltypes[[pos]][-which(names(celltypes[[pos]])%in%lis)]
+  }
+  else{
+    celltypes[[pos]] = celltypes[[pos]]
+  }
+}
+
+names = c()
+for (i in 1:length(celltypes)) {
+  names = c(names,unlist(names(celltypes[[i]])))
+}
+
+deconv_df = deconv_df[,colnames(deconv_df)%in%names]
+write.csv(deconv_df, paste0(getwd(),"/Output/Deconvolution/Deconvolution_afterFS_", dataset, ".txt"))
+```
+
+Subgroups of cells (No M0, CAF, Endothelial cells left after analysis)
+```{r}
+Bcells = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/B_",dataset,"_subgroups.rds"), refhook = NULL)
+CD4 = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/CD4_",dataset,"_subgroups.rds"), refhook = NULL)
+CD8 = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/CD8_",dataset,"_subgroups.rds"), refhook = NULL)
+M1 = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/M1_",dataset,"_subgroups.rds"), refhook = NULL)
+M2 = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/M2_",dataset,"_subgroups.rds"), refhook = NULL)
+#M0 = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/M0_",dataset,"_subgroups.rds"), refhook = NULL) 
+Monocytes = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/Mono_",dataset,"_subgroups.rds"), refhook = NULL)
+NK = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/NK_",dataset,"_subgroups.rds"), refhook = NULL)
+Cancer = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/Cancer_",dataset,"_subgroups.rds"), refhook = NULL)
+#CAF = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/CAF_",dataset,"_subgroups.rds"), refhook = NULL)
+CAF_filt[[2]]
+Macrophages = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/Macrophages_",dataset,"_subgroups.rds"), refhook = NULL)
+Dendritic = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/Dendritic_",dataset,"_subgroups.rds"), refhook = NULL)
+Neutrophils = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/Neutrophils_",dataset,"_subgroups.rds"), refhook = NULL)
+Endothelial = readRDS(paste0(getwd(),"/Output/Subgroups/", dataset, "/Endothelial_",dataset,"_subgroups.rds"), refhook = NULL)
+```
+
+35 combinations between methods and signatures (exclude MCP)
+```{r}
+deconv = all_deconvolutions_Counts_LPVan_TPM
+vec = c("Quantiseq_", "MCP_","Epidish_BPRNACan_",  "DeconRNASeq_BPRNACan_", "Epidish_BPRNACan3DProMet_", "DeconRNASeq_BPRNACan3DProMet_", "Epidish_BPRNACanProMet_", "DeconRNASeq_BPRNACanProMet_", "Epidish_CBSX_Fig2ab.NSCLC_PBMCs_scRNAseq_sigmatrix_", "DeconRNASeq_CBSX_Fig2ab.NSCLC_PBMCs_scRNAseq_sigmatrix_", "Epidish_CBSX_LM22_", "DeconRNASeq_CBSX_LM22_", "Epidish_CBSX_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_", "DeconRNASeq_CBSX_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_", "Epidish_CBSX_sigmatrix_HNSCC_Fig2cd_", "DeconRNASeq_CBSX_sigmatrix_HNSCC_Fig2cd_", "Epidish_CCLE_TIL10_", "DeconRNASeq_CCLE_TIL10_", "Epidish_CD226_", "DeconRNASeq_CD226_", "Epidish_Fig2ab.NSCLC_PBMCs_scRNAseq_sigmatrix_", "DeconRNASeq_Fig2ab.NSCLC_PBMCs_scRNAseq_sigmatrix_","Epidish_LM22_", "DeconRNASeq_LM22_", "Epidish_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_", "DeconRNASeq_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_", "Epidish_TIL10_", "DeconRNASeq_TIL10_", "CBSX__LM22__", "CBSX__NSCLC.scRNAseq__", "CBSX__scRNA.melanoma__", "CBSX__HNSCC__","CBSX__TIL10__", "CBSX__CCLE.TIL10__", "CBSX__CD226__")
+
+for (i in vec){
+  if(round(sum(rowSums(deconv[,grep(i, colnames(deconv))]))) != nrow(deconv)){
+    print(i)
+  }
+}
+
+```
+

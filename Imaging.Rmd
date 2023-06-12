@@ -1,0 +1,114 @@
+---
+title: "Imaging"
+author: "Marcelo Hurtado"
+date: '2023-01-15'
+output: html_document
+---
+
+Load and process IHC data
+
+```{r}
+com1=read.csv(paste0(getwd(),"/IHC/Combo1_summary_results-proc_Vera_Layer1and2.csv"), sep=',', header=T)
+com2=read.csv(paste0(getwd(),"/IHC/Combo2_summary_results-proc_Vera_Layer1and2.csv"), sep=',', header=T)
+```
+
+Preprocess data Combo 1
+```{r}
+colnames(com1)=gsub('X..','%',colnames(com1))
+
+com1l1=com1[grep('Layer 1',com1$Analysis.Region),]
+rownames(com1l1)=sapply(as.vector(com1l1$Image.Tag), function(x){
+res=unlist(strsplit(x, split='\\.'))[2]
+return(res)
+})
+
+com1l2=com1[grep('Layer 2',com1$Analysis.Region),]
+rownames(com1l2)=sapply(as.vector(com1l2$Image.Tag), function(x){
+res=unlist(strsplit(x, split='\\.'))[2]
+return(res)
+})
+
+rownames(com1l1)=gsub('\\-','\\.', rownames(com1l1))
+rownames(com1l1)=gsub('LU','Test.FFPE.',rownames(com1l1))
+rownames(com1l1)=gsub('.VAL','',rownames(com1l1))
+
+rownames(com1l2)=gsub('\\-','\\.', rownames(com1l2))
+rownames(com1l2)=gsub('LU','Test.FFPE.',rownames(com1l2))
+rownames(com1l2)=gsub('.VAL','',rownames(com1l2))
+
+# combo1
+# 1) Rhodamine 6G = GzB
+# 2) Cy5 = PDL1
+# 3) 5-FAM = PanCK
+# 4) Texas Red = CD8
+
+###34-37 columns with %positive cells over hoechst
+# com1l1_sel=com1l1[,c(44:59)]
+# com1l2_sel=com1l2[,c(44:59)]
+
+com1l1_sel=com1l1[,c(34:37)]
+com1l2_sel=com1l2[,c(34:37)]
+
+colnames(com1l1_sel)=c('tumGzb', 'tumPDL1', 'tumPanCK-C1', 'tumCD8')
+colnames(com1l2_sel)=c('Gzb', 'PDL1', 'PanCK-C1', 'CD8')
+
+rowSums(com1l1_sel)
+rowSums(com1l2_sel)
+
+```
+
+Preprocess data Combo 2
+```{r}
+colnames(com2)=gsub('X..','%',colnames(com2))
+
+com2l1=com2[grep('Layer 1',com2$Analysis.Region),]
+rownames(com2l1)=sapply(as.vector(com2l1$Image.Tag), function(x){
+res=unlist(strsplit(x, split='\\.'))[2]
+return(res)
+})
+
+com2l2=com2[grep('Layer 2',com2$Analysis.Region),]
+rownames(com2l2)=sapply(as.vector(com2l2$Image.Tag), function(x){
+res=unlist(strsplit(x, split='\\.'))[2]
+return(res)
+})
+
+rownames(com2l1)=gsub('\\-','\\.', rownames(com2l1))
+rownames(com2l1)=gsub('LU','Test.FFPE.',rownames(com2l1))
+rownames(com2l1)=gsub('.VAL','',rownames(com2l1))
+
+rownames(com2l2)=gsub('\\-','\\.', rownames(com2l2))
+rownames(com2l2)=gsub('LU','Test.FFPE.',rownames(com2l2))
+rownames(com2l2)=gsub('.VAL','',rownames(com2l2))
+
+
+# Combo 2:
+# 1) Rhodamine 6G = CD11b
+# 2) Cy5 = CD68
+# 3) 5-FAM = PanCK
+# 4) Texas Red = VISTA
+
+##32-35 columns with %positive cells over hoechst
+# com2l1_sel=com2l1[,c(41:55)]
+# com2l2_sel=com2l2[,c(41:55)]
+
+com2l1_sel=com2l1[,c(32:35)]
+com2l2_sel=com2l2[,c(32:35)]
+
+colnames(com2l1_sel)=c('tumCD11b', 'tumCD68', 'tumPanCK-C2', 'tumVISTA')
+colnames(com2l2_sel)=c('CD11b', 'CD68', 'PanCK-C2', 'VISTA')
+
+rowSums(com2l1_sel)
+rowSums(com2l2_sel)
+
+
+```
+
+Merge combos from each layer
+```{r}
+layer1 = cbind(com1l1_sel, com2l1_sel)
+layer2 = cbind(com1l2_sel, com2l2_sel)
+
+write.csv(layer1, paste0(getwd(),"/Output/Layer1_processed.csv"))
+write.csv(layer2, paste0(getwd(),"/Output/Layer2_processed.csv"))
+```

@@ -1,0 +1,484 @@
+---
+title: "DEG_Subgroups"
+output: html_document
+date: '2023-05-11'
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Datasets
+```{r}
+dataset = "LungPredict"
+dataset = "VanIP"
+dataset = "Vanderbilt"
+dataset = "Response"
+dataset = "Melanoma"
+dataset = "Immucan"
+dataset = "TCGA"
+dataset = "Liu"
+```
+
+Input annotations
+```{r}
+Counts <- read.csv(paste0(getwd(),"/Input/Counts/Counts_", dataset, ".csv"), row.names = 1)
+Counts_normalized <- as.matrix(read.csv(paste0(getwd(),"/Output/Counts_normalized_", dataset, ".csv"), row.names = 1))
+clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+deconv <- read.csv(paste0(getwd(),"/Output/Deconvolution/Deconvolution_afterFS_", dataset, ".txt"), row.names = 1)
+integration <- read.csv(paste0(getwd(),"/Output/DataIntegration/Features_integrated_", dataset, ".csv"), row.names = 1)
+```
+
+```{r}
+clinical.data = clinical.data[-which(clinical.data$Stages_simplified=="IV"),]
+integration = integration[,colnames(integration)%in%rownames(clinical.data)]
+dend_column = as.dendrogram(hclust(dist(t(integration)), method = "ward.D2"))
+plot(dend_column)
+```
+
+```{r}
+clinical.data$NK = "na"
+clinical.data$cluster = "na"
+integration = data.frame(t(integration))
+```
+
+NK_LungPredict_Subgroup_4_10
+NK_LungPredict_Subgroup_8
+
+CD4_LungPredict_Subgroup_4 (resting)
+CD4_LungPredict_Subgroup_5 (activated)
+CD4_LungPredict_Subgroup_3_14_13
+
+M1_LungPredict_Subgroup_5 and M1_LungPredict_Subgroup_3_4
+M1_LungPredict_Subgroup_1_6 
+
+```{r}
+clinical.data = clinical.data[-which(clinical.data$Stages_simplified=="IV"),]
+Counts = Counts[,colnames(Counts)%in%rownames(clinical.data)]
+Counts_normalized = Counts_normalized[,colnames(Counts_normalized)%in%rownames(clinical.data)]
+integration = integration[rownames(integration)%in%rownames(clinical.data),]
+
+cluster = "Cluster.3"
+summary(integration[,which(colnames(integration)==cluster)])
+idx = which((integration[,which(colnames(integration)==cluster)] > 0.21)==T)
+vec = rownames(integration)[idx]
+
+clinical.data$cluster[rownames(clinical.data)%in%vec] = paste0("HIGH_", cluster)
+
+idx = which((integration[,which(colnames(integration)==cluster)] < 0.15)==T)
+vec = rownames(integration)[idx]
+
+clinical.data$cluster[rownames(clinical.data)%in%vec] = paste0("LOW_", cluster)
+
+table(clinical.data$cluster)
+```
+
+```{r}
+summary(deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_4_10")])
+idx = which((deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_4_10")] > 0.04)==T)
+vec = rownames(deconv)[idx]
+
+clinical.data$NK[rownames(clinical.data)%in%vec] = "HIGH_NK_sub_4_10"
+
+idx = which((deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_4_10")] < 0.01)==T)
+vec = rownames(deconv)[idx]
+
+clinical.data$NK[rownames(clinical.data)%in%vec] = "LOW_NK_sub_4_10"
+
+table(clinical.data$NK)
+```
+
+```{r}
+summary(deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_8")])
+idx = which((deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_8")] > 0.03)==T)
+vec = rownames(deconv)[idx]
+
+clinical.data$NK[rownames(clinical.data)%in%vec] = "HIGH_NK_sub_8"
+
+idx = which((deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_8")] < 0.01)==T)
+vec = rownames(deconv)[idx]
+
+clinical.data$NK[rownames(clinical.data)%in%vec] = "LOW_NK_sub_8"
+```
+
+```{r}
+m2 <- do.call(rbind, strsplit(rownames(Counts_normalized), split="_", fixed = TRUE))
+rownames(Counts_normalized) = m2[,2]
+```
+
+DEG analysis
+```{r}
+#clinical.data$NK = factor(clinical.data$NK)
+clinical.data$cluster = factor(clinical.data$cluster)
+clinical.data$Batch <- as.factor(clinical.data$Batch)
+clinical.data$Smoking_Status <- as.factor(clinical.data$Smoking_Status)
+clinical.data$Gender <- as.factor(clinical.data$Gender)
+clinical.data$Age_Bracket <- as.factor(clinical.data$Age_Bracket)
+clinical.data$Stages_simplified <- as.factor(clinical.data$Stages_simplified)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = round(Counts),
+  colData = clinical.data,
+  design = ~Batch + Stages_simplified + Gender + Smoking_Status + Age_Bracket + cluster)
+
+dds <- estimateSizeFactors(dds)
+
+ddsObj = DESeq(dds)
+resultsALL = results(ddsObj, contrast = c("cluster", paste0("HIGH_",cluster), paste0("LOW_",cluster)), pAdjustMethod = "BH")
+#resultsALL = results(ddsObj, contrast = c("NK", "HIGH_NK_sub_4_10", "LOW_NK_sub_4_10"), pAdjustMethod = "BH")
+#resultsALL = results(ddsObj, contrast = c("NK", "HIGH_NK_sub_8", "LOW_NK_sub_8"), pAdjustMethod = "BH")
+
+res = data.frame(resultsALL)
+res = na.omit(res)
+res = res[res$padj < 0.05,]
+m2 <- do.call(rbind, strsplit(rownames(res), split="_", fixed = TRUE))
+rownames(res) = m2[,1]
+res$Ensembl = rownames(res)
+res <- data.frame("entrez_id" = mapIds(org.Hs.eg.db,
+                                               keys = rownames(res),
+                                               keytype = "ENSEMBL",
+                                               column = "ENTREZID",
+                                               multiVals = "first")
+                         ) %>% 
+  dplyr::filter(!is.na(entrez_id)) %>%  
+  tibble::rownames_to_column("Ensembl") %>% 
+  dplyr::inner_join(res, by = "Ensembl") 
+  
+```
+TFs analysis (msVIPER)
+```{r}
+RNA.counts.normalized = Counts_normalized
+test_name = paste0("HIGH_",cluster)
+ref_name = paste0("LOW_",cluster)
+measure = clinical.data$cluster
+
+# Generating test and ref data
+test_i <- which(measure == test_name)
+ref_i <- which(measure == ref_name)
+  
+mat_test <- as.matrix(RNA.counts.normalized[,test_i])
+mat_ref <- as.matrix(RNA.counts.normalized[,ref_i])
+  
+# Generating NULL model (test, reference)
+dnull <- ttestNull(mat_test, mat_ref, per=1000)
+
+# Generating signature
+signature <- rowTtest(mat_test, mat_ref)
+signature <- (qnorm(signature$p.value/2, lower.tail = FALSE) * sign(signature$statistic))
+signature <- na.omit(signature)
+signature <- signature[,1]
+  
+# Running msVIPER
+mra <- msviper(signature, regu, dnull, verbose = FALSE)
+mra <- ledge(mra)
+# Extract Differential Active TFs
+TFs = data.frame(cbind(mra[["es"]][["p.value"]],mra[["es"]][["nes"]]))
+colnames(TFs)[c(1,2)] = c("pval", "NES")
+vec = TFs$pval < 0.05
+TFs_msViper_adj = TFs[vec,]
+TFs_msViper_adj$Symbol = rownames(TFs_msViper_adj) 
+#Convert to entrez ID
+TFs_msViper_adj <- data.frame("entrez_id" = mapIds(org.Hs.eg.db,
+                                               keys = rownames(TFs_msViper_adj),
+                                               keytype = "SYMBOL",
+                                               column = "ENTREZID",
+                                               multiVals = "first")
+                         ) %>% 
+  dplyr::filter(!is.na(entrez_id)) %>%  
+  tibble::rownames_to_column("Symbol") %>% 
+  dplyr::inner_join(TFs_msViper_adj, by = "Symbol") 
+```
+
+msVIPER + targets --> enrichment  
+```{r}
+#Add targets 
+x = mra[["ledge"]][which(names(mra[["ledge"]])%in%rownames(TFs[[1]]))]
+genes = c()
+for (i in 1:length(x)) {
+  genes = c(genes,x[[i]])
+}
+
+#Convert to entrez ID
+genesID <- data.frame("entrez_id" = mapIds(org.Hs.eg.db,
+                                               keys = genes,
+                                               keytype = "SYMBOL",
+                                               column = "ENTREZID",
+                                               multiVals = "first")
+                         ) %>% 
+  dplyr::filter(!is.na(entrez_id))
+
+#Filter only DEG targets
+genesID = genesID[which(genesID$entrez_id%in%res$entrez_id),]
+
+hs_kegg_df <- msigdbr(species = "Homo sapiens") %>%
+  dplyr::filter(
+  gs_cat == "C2", # This is to filter only to the C2 curated gene sets
+  gs_subcat == "CP:KEGG" # This is because we only want KEGG pathways
+  )
+  
+kegg_results = enrichKEGG(gene = c(genesID, TFs_msViper_adj$entrez_id), organism = "hsa",pvalueCutoff = 0.05, pAdjustMethod = "BH")
+  
+print(dotplot(kegg_results))
+
+x <- enrichPathway(gene=c(genesID, TFs_msViper_adj$entrez_id), pvalueCutoff = 0.05, readable=TRUE)
+print(dotplot(x))
+```
+
+Heatmap of DEG 
+```{r}
+vpres<- viper(RNA.counts.normalized, regu, verbose = FALSE, minsize = 4)
+DEG = vpres[rownames(vpres)%in% TFs_msViper_adj$Symbol,]
+```
+
+```{r}
+clinical.data = clinical.data[-which(clinical.data$cluster=="na"),]
+immunescores <- read.csv(paste0(getwd(),"/Output/Immunoscores/ImmuneScores_", dataset, ".csv"), row.names = 1)
+immunescores = immunescores[rownames(immunescores)%in%rownames(clinical.data),]
+immunescores = minMax(immunescores)
+clinical.data = cbind(clinical.data, immunescores)
+ha = heatmap_annotation(clinical.data)
+vec = which(colnames(DEG)%in%rownames(clinical.data))
+ht1 = Heatmap(t(scale(t(DEG[,vec]))), 
+        border = T, top_annotation = ha, 
+        clustering_method_rows = "ward.D2", clustering_method_columns = "ward.D2",
+        column_dend_height = unit(5, "cm"), row_dend_width = unit(5, "cm"), 
+        column_dend_reorder = T, row_dend_reorder = T,
+        show_row_names = T, 
+        show_heatmap_legend = T, 
+        row_names_gp = gpar(fontsize = 9), 
+        column_names_gp = gpar(fontsize =12), 
+        width = unit(15, "cm"), height = unit(20, "cm"),
+        heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
+                                    legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
+
+png(paste0(getwd(),"/Figures/Heatmaps/DEG_clusters3.png"), width = 4000, height = 4500, res=250)
+draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
+dev.off()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=========================================================================
+
+NK_4_10 vs NK_8
+
+```{r}
+clinical.data$NK = "na"
+summary(deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_4_10")])
+idx = which((deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_4_10")] > 0.04)==T)
+vec = rownames(deconv)[idx]
+
+clinical.data$NK[rownames(clinical.data)%in%vec] = "HIGH_NK_sub_4_10"
+
+summary(deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_8")])
+idx = which((deconv[,which(colnames(deconv)=="NK_LungPredict_Subgroup_8")] > 0.03)==T)
+vec = rownames(deconv)[idx]
+
+clinical.data$NK[rownames(clinical.data)%in%vec] = "HIGH_NK_sub_8"
+
+table(clinical.data$NK)
+```
+
+```{r}
+table(clinical.data$NK)
+clinical.data$NK = factor(clinical.data$NK)
+clinical.data$Batch <- as.factor(clinical.data$Batch)
+clinical.data$Smoking_Status <- as.factor(clinical.data$Smoking_Status)
+clinical.data$Gender <- as.factor(clinical.data$Gender)
+clinical.data$Age_Bracket <- as.factor(clinical.data$Age_Bracket)
+clinical.data$Stages_simplified <- as.factor(clinical.data$Stages_simplified)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = round(Counts),
+  colData = clinical.data,
+  design = ~Batch + Stages_simplified + Gender + Smoking_Status + Age_Bracket + NK)
+
+dds <- estimateSizeFactors(dds)
+
+ddsObj = DESeq(dds)
+resultsALL = results(ddsObj, contrast = c("NK", "HIGH_NK_sub_8","HIGH_NK_sub_4_10"), pAdjustMethod = "BH")
+
+# png(paste0(getwd(),"/Figures/Volcanos/Volcano_NK.png"), width = 2000, height = 2000, res=100)
+# print(EnhancedVolcano(resultsALL,
+#                         title = "HIGH_NK_sub_8 vs LOW_NK_sub_8",
+#                         subtitle = NULL,
+#                         caption = NULL,
+#                         lab = rownames(resultsALL),
+#                         x = 'log2FoldChange',
+#                         y = 'padj',
+#                         xlim = c(-5, 5),
+#                         ylim = c(0, 5), 
+#                         pCutoff = 10e-2,
+#                         FCcutoff = 1))
+# dev.off()
+
+res = data.frame(resultsALL)
+res = na.omit(res)
+res = res[res$padj < 0.05,]
+m2 <- do.call(rbind, strsplit(rownames(res), split="_", fixed = TRUE))
+rownames(res) = m2[,1]
+res$Ensembl = rownames(res)
+res <- data.frame("entrez_id" = mapIds(org.Hs.eg.db,
+                                               keys = rownames(res),
+                                               keytype = "ENSEMBL",
+                                               column = "ENTREZID",
+                                               multiVals = "first")
+                         ) %>% 
+  dplyr::filter(!is.na(entrez_id)) %>%  
+  tibble::rownames_to_column("Ensembl") %>% 
+  dplyr::inner_join(res, by = "Ensembl") 
+  
+```
+Option 1: GSEA analysis 
+```{r}
+# Create a vector of the gene unuiverse
+kegg_gene_list <- res$log2FoldChange
+
+# Name vector with ENTREZ ids
+names(kegg_gene_list) <- res$entrez_id
+
+# omit any NA values 
+kegg_gene_list<-na.omit(kegg_gene_list)
+
+# sort the list in decreasing order (required for clusterProfiler)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+
+kk2 <- gseKEGG(geneList     = kegg_gene_list,
+               organism     = "hsa",
+               minGSSize    = 3,
+               maxGSSize    = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "BH")
+
+dotplot(kk2, showCategory = 10, title = "Enriched Pathways" , split=".sign") + facet_grid(.~.sign)
+```
+
+Option 2: ORA enrichment of DEG
+```{r}
+resTOP = res[(res$log2FoldChange>1.5)|(res$log2FoldChange<(-1.5))]
+kegg_results = enrichKEGG(gene = resTOP$entrez_id, organism = "hsa",pvalueCutoff = 0.05, pAdjustMethod = "BH")
+dotplot(kegg_results, showCategory = 10, title = "Enriched Pathways") 
+
+x <- enrichPathway(gene=resTOP$entrez_id, pvalueCutoff = 0.05, readable=TRUE)
+print(dotplot(x))
+```
+TFs analysis (msVIPER)
+```{r}
+RNA.counts.normalized = Counts_normalized
+test_name = "HIGH_NK_sub_4_10"
+ref_name = "HIGH_NK_sub_8"
+measure = clinical.data$NK
+
+# Generating test and ref data
+test_i <- which(measure == test_name)
+ref_i <- which(measure == ref_name)
+  
+mat_test <- as.matrix(RNA.counts.normalized[,test_i])
+mat_ref <- as.matrix(RNA.counts.normalized[,ref_i])
+  
+# Generating NULL model (test, reference)
+dnull <- ttestNull(mat_test, mat_ref, per=1000)
+
+# Generating signature
+signature <- rowTtest(mat_test, mat_ref)
+signature <- (qnorm(signature$p.value/2, lower.tail = FALSE) * sign(signature$statistic))
+signature <- na.omit(signature)
+signature <- signature[,1]
+  
+# Running msVIPER
+mra <- msviper(signature, regu, dnull, verbose = FALSE)
+mra <- ledge(mra)
+```
+
+Option 3: msVIPER --> enrichment (KEGG)
+```{r}
+# Extract Differential Active TFs
+TFs = data.frame(cbind(mra[["es"]][["p.value"]],mra[["es"]][["nes"]]))
+colnames(TFs)[c(1,2)] = c("pval", "NES")
+TFs_msViper_adj = TFs[TFs$pval < 0.05,]
+TFs_msViper_adj = TFs_msViper_adj[TFs_msViper_adj$NES<0,]
+TFs_msViper_adj$Symbol = rownames(TFs_msViper_adj) 
+#Convert to entrez ID
+TFs_msViper_adj <- data.frame("entrez_id" = mapIds(org.Hs.eg.db,
+                                               keys = rownames(TFs_msViper_adj),
+                                               keytype = "SYMBOL",
+                                               column = "ENTREZID",
+                                               multiVals = "first")
+                         ) %>% 
+  dplyr::filter(!is.na(entrez_id)) %>%  
+  tibble::rownames_to_column("Symbol") %>% 
+  dplyr::inner_join(TFs_msViper_adj, by = "Symbol") 
+#Enrichment KEGG
+kegg_results = enrichKEGG(gene = TFs_msViper_adj$entrez_id, organism = "hsa", universe = universeID$target, pvalueCutoff = 0.05, pAdjustMethod = "BH")
+dotplot(kegg_results, showCategory = 10, title = "Enriched Pathways") 
+
+x <- enrichPathway(gene=TFs_msViper_adj$entrez_id, universe = universeID$target,pvalueCutoff = 0.05, readable=TRUE)
+print(dotplot(x))
+```
+
+Option 4: msVIPER --> enrichment (KEGG) 
+```{r}
+#Add targets 
+x = mra[["ledge"]][which(names(mra[["ledge"]])%in%TFs_msViper_adj$Symbol)]
+genes = c()
+for (i in 1:length(x)) {
+  genes = c(genes,x[[i]])
+}
+
+#Convert to entrez ID
+genesID <- data.frame("entrez_id" = mapIds(org.Hs.eg.db,
+                                               keys = genes,
+                                               keytype = "SYMBOL",
+                                               column = "ENTREZID",
+                                               multiVals = "first")
+                         ) %>% 
+  dplyr::filter(!is.na(entrez_id))
+
+#Filter only DEG targets
+genesID = genesID[which(genesID$entrez_id%in%res$entrez_id),]
+
+kegg_results = enrichKEGG(gene = c(genesID, TFs_msViper_adj$entrez_id), organism = "hsa",pvalueCutoff = 0.05, pAdjustMethod = "BH")
+  
+print(dotplot(kegg_results))
+```
+
+Option 5: msVIPER --> enrichment (REACTOME)
+```{r}
+x <- enrichPathway(gene=c(genesID, TFs_msViper_adj$entrez_id), pvalueCutoff = 0.05, readable=TRUE)
+print(dotplot(x))
+```
+

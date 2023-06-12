@@ -1,0 +1,71 @@
+---
+title: "ClusterAnalysis"
+output: html_document
+date: '2023-05-07'
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Datasets
+```{r}
+dataset = "LungPredict"
+dataset = "VanIP"
+dataset = "Vanderbilt"
+dataset = "Response"
+dataset = "Melanoma"
+dataset = "Immucan"
+dataset = "TCGA"
+dataset = "Liu"
+```
+
+```{r}
+Counts_normalized <- as.matrix(read.csv(paste0(getwd(),"/Output/Counts_normalized_", dataset, ".csv"), row.names = 1))
+integration <- read.csv(paste0(getwd(), "/Output/Feature_Selection/Anova_metastasis_Features_", dataset,".csv"), row.names=1)
+clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+```
+
+```{r}
+res_gsva = gsva_analysis(data.frame(Counts_normalized), "C7")
+res_gsva = remove_high_corr(res_gsva) 
+res_gsva = res_gsva[order(rowMeans(res_gsva), decreasing=TRUE)[1:30],]
+```
+
+Relate results with features
+```{r}
+moduleTraitCor = cor(t(res_gsva), integration[1:nrow(integration)-1,], use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nrow(integration))
+
+textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
+                  signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+  
+idx = which(moduleTraitPvalue>0.05)
+for (i in idx) {
+  textMatrix[i] = NA
+}
+
+d <- dist(t(moduleTraitCor), method = "euclidean")
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+  
+###Figure module-trait relationship
+png(paste0(getwd(),"/Figures/tests2_", dataset, ".png"), width = 2500, height = 2000, res=150)
+par(mar = c(15, 50, 4, 4)) #bottom, left, top, right
+labeledHeatmap(Matrix = moduleTraitCor[,vec],
+               xLabels = names(integration[,vec]),
+               yLabels = rownames(res_gsva),
+               ySymbols = rownames(res_gsva),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix[,vec],
+               setStdMargins = FALSE,
+               cex.text = 0.8,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+
+```
