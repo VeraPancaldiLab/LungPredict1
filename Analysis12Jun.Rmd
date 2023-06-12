@@ -1,0 +1,400 @@
+---
+title: "Analysis12Jun"
+author: "Marcelo Hurtado"
+date: "2023-06-12"
+output: html_document
+---
+
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+```{r}
+dataset = "LungPredict"
+dataset = "Vanderbilt"
+dataset = "LPVan"
+```
+
+```{r}
+deconv <- read.delim("~/Downloads/all_deconvolutions_Counts_LPVan_TPM.txt", row.names=1)
+```
+
+```{r}
+#Removing MCP 
+deconv <- deconv[,-grep("MCP", colnames(deconv))]
+#Removing CD226
+deconv <- deconv[,-grep("CD226", colnames(deconv))]
+#Filtering equal method-signatures (corr=1)
+deconv = data.matrix(deconv[,-which(duplicated(t(deconv)))])
+#Remove columns with low variance
+#deconv = data.frame(deconv[,-which(colVars(deconv)<=summary(colVars(deconv))[2])])
+#Remove columns with more than 90% of zeros
+i <- colSums(deconv == 0, na.rm=TRUE) < round(0.7*nrow(deconv))
+deconv <- data.frame(deconv[, i, drop=FALSE])
+```
+
+
+```{r}
+compute_cell.types = function(data){
+  #columns:features and rows:samples
+  ################################# B cells
+  Bcells <- data[,grep("B", colnames(data))]
+  if(length(grep("M2", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("M2", colnames(Bcells))]}else{Bcells <- Bcells}
+  if(length(grep("ancer", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("ancer", colnames(Bcells))]}else{Bcells <- Bcells}
+  if(length(grep("asophils", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("asophils", colnames(Bcells))]}else{Bcells <- Bcells}
+  if(length(grep("CD4", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("CD4", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("Mono", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("Mono", colnames(Bcells))]}else{Bcells <- Bcells}
+  if(length(grep("Treg", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("Treg", colnames(Bcells))]}else{Bcells <- Bcells}
+  if(length(grep("Neu", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("Neu", colnames(Bcells))]}else{Bcells <- Bcells}
+  if(length(grep("M1", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("M1", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("CD8", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("CD8", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("M0", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("M0", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("NK", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("NK", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("ndothelial", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("ndothelial", colnames(Bcells))]}else{Bcells <- Bcells}      
+  if(length(grep("CAF", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("CAF", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("acrophage", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("acrophage", colnames(Bcells))]}else{Bcells <- Bcells}        
+  if(length(grep("endritic", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("endritic", colnames(Bcells))]}else{Bcells <- Bcells}      
+  if(length(grep("alignant", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("alignant", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("Mast", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("Mast", colnames(Bcells))]}else{Bcells <- Bcells}    
+  if(length(grep("yocyte", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("yocyte", colnames(Bcells))]}else{Bcells <- Bcells}  
+  if(length(grep("ibroblast", colnames(Bcells)))>0){Bcells <- Bcells[,-grep("ibroblast", colnames(Bcells))]}else{Bcells <- Bcells} 
+  B = Bcells
+  
+  Macrophages = data[,grep("acrophages", colnames(data))]
+  M0 = data[,grep("M0", colnames(data))]
+  M1 = data[,grep("M1", colnames(data))]
+  M2 <- data[,grep("M2", colnames(data))]
+  if(length(grep("LM22", colnames(M2)))>0){M2 <- M2[,-grep("LM22", colnames(M2))]}else{M2 <- M2} 
+  test = data[,grep("LM22", colnames(data))]
+  test = test[,grep("Macrophages.M2", colnames(test))]
+  M2 = cbind(M2, test)
+  Macrophages = Macrophages[,-which(colnames(Macrophages)%in%c(colnames(M0), colnames(M1), colnames(M2)))]
+  
+  Monocytes = data[,grep("Mono", colnames(data))]
+  Neutrophils <- data[,grep("Neu", colnames(data))]
+  
+  NK = data[,grep("NK", colnames(data))]
+  NK.activated <- grep("activated", colnames(NK), value = TRUE)
+  NK.activated <- NK[, NK.activated, drop = FALSE]
+  NK.resting = grep("resting", colnames(NK))
+  NK.resting <- NK[, NK.resting, drop = FALSE]
+  NKT = grep("NKT", colnames(NK))
+  NKT <- NK[, NKT, drop = FALSE]
+  NK = NK[,-which(colnames(NK)%in%c(colnames(NK.activated), colnames(NK.resting), colnames(NKT)))]  
+  
+  ################################# CD4 cells
+  CD4 <- data[,grep("CD4", colnames(data))]
+  CD4.activated = grep("activated", colnames(CD4))
+  CD4.activated = CD4[, CD4.activated, drop = FALSE]
+  CD4.resting = grep("resting", colnames(CD4))
+  CD4.resting = CD4[, CD4.resting, drop = FALSE]
+  CD4.naive = grep("naive", colnames(CD4))
+  CD4.naive = CD4[, CD4.naive, drop = FALSE]
+  CD4.non.regulatory = grep("regulatory", colnames(CD4))
+  CD4.non.regulatory = CD4[, CD4.non.regulatory, drop = FALSE]
+  CD4 = CD4[,-which(colnames(CD4)%in%c(colnames(CD4.activated), colnames(CD4.resting), colnames(CD4.naive), colnames(CD4.non.regulatory)))]  
+  
+  ################################# CD8 cells
+  CD8 <- data[,grep("CD8", colnames(data))]
+  Tregs = data[,grep("regs", colnames(data))]
+  Dendritic = data[,grep("endritic", colnames(data))]
+  Dendritic.activated = grep("activated", colnames(Dendritic))
+  Dendritic.activated = Dendritic[, Dendritic.activated, drop = FALSE]
+  Dendritic.resting = grep("resting", colnames(Dendritic))
+  Dendritic.resting = Dendritic[, Dendritic.resting, drop = FALSE]
+  Dendritic = Dendritic[,-which(colnames(Dendritic)%in%c(colnames(Dendritic.activated), colnames(Dendritic.resting)))]
+  
+  Cancer = data[,grep("ancer", colnames(data))]
+  
+  Endothelial = grep("dothelial", colnames(data))
+  Endothelial = data[, Endothelial, drop = FALSE]
+  
+  CAF = data[,grep("CAF", colnames(data))]
+  
+  cell_types = list(B, Macrophages, M0, M1, M2, Monocytes, Neutrophils, NK, NK.activated, NK.resting, NKT, CD4, CD4.activated, CD4.resting, CD4.naive, CD4.non.regulatory,
+                    CD8, Tregs, Dendritic, Dendritic.activated, Dendritic.resting, Cancer, Endothelial, CAF)
+  names(cell_types) = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", "CD4.NAIVE", "CD4.NON.REGULATORY",
+                        "CD8", "TREGS", "DENDRITIC", "DENDRITIC.ACTIVATED", "DENDRITIC.RESTING", "CANCER", "ENDOTHELIAL", "CAF")
+  
+  return(cell_types)
+  
+}
+cells = compute_cell.types(data.frame(deconv))
+```
+
+```{r}
+for (i in 1:length(cells)) {
+  data = cells[[i]]
+  if(ncol(data)!=0){
+    idx = which(colVars(as.matrix(data))<=summary(colVars(as.matrix(data)))[2])
+    df = data.frame(data[,-idx])
+    if(ncol(df)==1){colnames(df)[1] = names(cells[[i]])[-idx]}
+    cells[[i]] = df
+  }
+}
+```
+
+
+```{r}
+remove_subgroups = function(groups){
+  lis = c()
+  for (pos in 1:length(groups)){
+    x = c()
+    for (i in 1:length(groups[[pos]])) {
+      x =  c(x,str_split(groups[[pos]][[i]], "_")[[1]][1])
+    }
+    if(length(unique(x)) == 1){
+      lis = c(lis, names(groups)[[pos]])
+    }
+  }
+  
+  if(length(lis)>0){
+    groups = groups[-which(names(groups)%in%lis)]
+  }
+  
+  return(groups)
+}
+compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0.6, thres_change = 0.01){
+  # data  = data.frame(cells$M1)
+  # cell = names(cells)[4]
+  data = data.frame(data)
+  if (ncol(data) < 2) {
+    warning("Data must have at least two columns for subgrouping.")
+    cell_subgroups = list()
+    subgroup = list()
+    lis = c()
+    return(list(data, cell_subgroups, subgroup, lis))
+  }else{
+    cell_subgroups = list()
+    lis = list()
+    ###################################################################################################################Similarity part  
+    is_similar <- function(value1, value2, threshold) {return(abs(value1 - value2) <= threshold)}
+    similarity_matrix <- matrix(FALSE, nrow = ncol(data), ncol = ncol(data), dimnames = list(names(data), names(data)))
+    for (col1 in names(data)) {
+      for (col2 in names(data)) {
+        similarity <- all(mapply(is_similar, data[[col1]], data[[col2]], MoreArgs = list(thres_similarity)))
+        similarity_matrix[col1, col2] <- similarity
+      }
+    }
+    # Get upper triangle of the correlation matrix
+    get_upper_tri <- function(cormat){
+      cormat[lower.tri(cormat, diag = T)]<- NA
+      return(cormat)
+    }
+    
+    upper_tri <- get_upper_tri(similarity_matrix)
+    x <- melt(upper_tri) %>%
+      na.omit() %>%
+      mutate_all(as.character)
+    indice = 1
+    subgroup = list()
+    vec = unique(x$Var1)
+    while(length(vec)>0){
+      sub = x[which(x$Var1%in%vec[1]),] 
+      sub = sub[which(sub$value==T),]
+      if(nrow(sub)!=0){
+        subgroup[[indice]] = c(vec[1], sub$Var2)
+        x = x[-which(x$Var1%in%subgroup[[indice]]),]
+        x = x[-which(x$Var2%in%subgroup[[indice]]),]
+        vec = vec[-which(vec%in%subgroup[[indice]])]
+        indice = indice + 1
+      }else{
+        indice = indice
+        vec = vec[-1]
+      }
+    }
+    
+    if(length(subgroup)!=0){
+      #Name subgroups    
+      for (i in 1:length(subgroup)){ 
+        names(subgroup)[i] = paste0(cell, "_Subgroup.Similarity", i)
+      }
+      
+      lis = remove_subgroups(subgroup)
+      data_sub = c()
+      #Take average expression of subgroups
+      for(i in 1:length(subgroup)){ #Create data frame with features subgroupped
+        sub = data.frame(data[,colnames(data)%in%subgroup[[i]]]) #Map features that are inside each subgroup from input (deconvolution)
+        sub$average = rowMeans(sub) #Compute average of subgroup across patients 
+        data_sub = data.frame(cbind(data_sub, sub$average)) #Save avg in a new data frame
+        colnames(data_sub)[i] = names(subgroup)[i]
+        name = colnames(data)[which(!(colnames(data)%in%subgroup[[i]]))]
+        data = data[,-which(colnames(data)%in%subgroup[[i]])] #Remove from deconvolution features that are subgrouped
+        if(ncol(data.frame(data))==1){
+          data = as.data.frame(data)
+          colnames(data)[1] = name
+        }
+      }
+      
+      rownames(data_sub) = rownames(data) #List of patients
+      data_sub = data.frame(data_sub[,colnames(data_sub)%in%names(lis)])
+      colnames(data_sub) = names(lis)
+      
+      data = cbind(data, data_sub) #Join subgroups in deconvolution file
+      k = 2
+    }else{
+      k = 3
+    }
+    
+    if(ncol(data) == 1){
+      cell_subgroups = list()
+      return(list(data, cell_subgroups, subgroup, lis))  
+    }
+    ###################################################################################################################Correlation part
+    
+    if(k==2 | k==3){
+      terminate = FALSE
+      iteration = 1
+      while (terminate == FALSE) {
+        corr_df <- correlation(data.matrix(data))
+        vec = colnames(data)
+        indice = 1
+        subgroup = list()
+        data_sub = c() 
+        while(length(vec)>0){ #Keep running until no features are left
+          if(vec[1] %in% corr_df$measure1){ #Check if feature still no-grouped
+            tab = corr_df[corr_df$measure1 == vec[1],] #Take one feature against the others
+            tab = tab[tab$r>thres_corr,] #Select features corr above the threshold = 0.75
+            if(indice>1){
+              idx = which(tab$measure1 %in% subgroup[[indice-1]])
+              idy = which(tab$measure2 %in% subgroup[[indice-1]])
+              if(length(idx)>0){tab = tab[-idx,]} #Remove features already subgroupped    
+              if(length(idy)>0){tab = tab[-idy,]} #Remove features already subgroupped    
+            }
+            if(nrow(tab)!=0){ #If algorithm found features above corr
+              subgroup[[indice]] = c(vec[1], tab$measure2) #Save features as subgroup
+              vec = vec[-which(vec%in%subgroup[[indice]])] #Remove feature already subgroupped from vector  
+              indice = indice + 1
+            }else{ #Condition when there is no correlation above the threshold (features no subgroupped)
+              corr_df = corr_df[-which(corr_df$measure1 == vec[1]),] #Remove variable from corr matrix to keep subgrouping the others
+              vec = vec[-1] #Remove variable from vector to keep analyzing the others 
+              indice = indice #Not increase index cause no subgroup appeared
+            }
+          }else{ #If feature is not in corr matrix it means that there is no any significant correlation against it and other features 
+            vec = vec[-1] #Remove variable from vector to keep analyzing the others
+            indice = indice  #Not increase index cause no subgroup appeared
+          }
+        }
+        
+        if(length(subgroup)!=0){
+          #Name subgroups
+          if(iteration > 1){
+            idx = c()
+            for (i in 1:length(subgroup)) {
+              for(j in 1:length(subgroup[[i]])){
+                idx = as.numeric(c(idx, str_split(subgroup[[i]], "_")[[j]][3]))
+              }
+            }
+            for (i in 1:length(subgroup)){ 
+              names(subgroup)[i] = paste0(cell, "_Subgroup_", paste0(idx, collapse = "."))
+            }
+          }else{
+            for (i in 1:length(subgroup)){ 
+              names(subgroup)[i] = paste0(cell, "_Subgroup_", i)
+            }
+            cell_subgroups = subgroup 
+          }
+          
+          #Take average expression of subgroups
+          for(i in 1:length(subgroup)){ #Create data frame with features subgroupped
+            sub = data.frame(data[,colnames(data)%in%subgroup[[i]]]) #Map features that are inside each subgroup from input (deconvolution)
+            sub$average = rowMeans(sub) #Compute average of subgroup across patients 
+            data_sub = data.frame(cbind(data_sub, sub$average)) #Save avg in a new data frame
+            colnames(data_sub)[i] = names(subgroup)[i]
+            name = colnames(data)[which(!(colnames(data)%in%subgroup[[i]]))]
+            data = data.frame(data[,-which(colnames(data)%in%subgroup[[i]])]) #Remove from deconvolution features that are subgrouped
+            if(ncol(data.frame(data))==1){
+              data = as.data.frame(data)
+              colnames(data)[1] = name
+            }
+          }
+          
+          rownames(data_sub) = rownames(data) #List of patients
+          
+          new_average_values = colMeans(data.matrix(data_sub))
+          
+          if(iteration == 1){
+            data_sub = data.frame(data_sub[,colnames(data_sub)%in%names(cell_subgroups)])
+            colnames(data_sub) = names(cell_subgroups)
+          }
+          
+          #Compare averages and test if they are above certain threshold 
+          if(iteration == 1){
+            df = data
+          }else{
+            for (i in 1:length(subgroup)) {
+              for (j in 1:length(idx)) {
+                change = max(abs(average_values[idx[j]] - new_average_values[i]))
+                if (change > thres_change) {
+                  terminate <- TRUE
+                }
+              }
+            }
+          }
+          average_values = new_average_values
+          
+          if(ncol(data_sub)>1){
+            data = data_sub
+          }else{
+            terminate = TRUE
+          }
+          iteration = iteration + 1
+        }else{
+          terminate = TRUE
+          if(!is.null(tryCatch(eval(parse(text = df)), error = function(e) NULL))==F){
+            df = data
+          }
+        }
+        
+      }
+      
+      if(is.null(data_sub)==TRUE){
+        data = cbind(df, data)
+      }else{
+        data = cbind(df, data, data_sub)
+      }
+      
+      idx = which(duplicated(t(data)))
+      if(length(idx)>0){
+        data = data[,-idx]
+      }
+    }
+    
+    
+    return(list(data, cell_subgroups, subgroup, lis))
+  }
+  
+}
+```
+
+```{r}
+res = list()
+groups = list()
+groups_similarity = list()
+for (i in 1:length(cells)) {
+  x = compute_subgroups(cells[[i]], names(cells)[i])
+  res = c(res, x[1])
+  groups = c(groups, x[2])
+  groups_similarity = c(groups_similarity, x[4])
+}
+names_cells = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", "CD4.NAIVE", "CD4.NON.REGULATORY",
+                        "CD8", "TREGS", "DENDRITIC", "DENDRITIC.ACTIVATED", "DENDRITIC.RESTING", "CANCER", "ENDOTHELIAL", "CAF")
+names(res) = names_cells
+names(groups) = names_cells
+names(groups_similarity) = names_cells
+#Joining subgroups in a new deconvolution output
+dt = c()
+for (i in 1:length(res)) {
+  dt = c(dt, res[[i]])
+}
+dt = data.frame(dt)
+rownames(dt) = rownames(deconv)
+```
+
+```{r}
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(dt)), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
+```
+
