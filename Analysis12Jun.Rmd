@@ -128,9 +128,9 @@ for (i in 1:length(cells)) {
   data = cells[[i]]
   if(ncol(data)!=0){
     idx = which(colVars(as.matrix(data))<=summary(colVars(as.matrix(data)))[2])
-    df = data.frame(data[,-idx])
-    if(ncol(df)==1){colnames(df)[1] = names(cells[[i]])[-idx]}
-    cells[[i]] = df
+    mat = data.frame(data[,-idx])
+    if(ncol(mat)==1){colnames(mat)[1] = names(cells[[i]])[-idx]}
+    cells[[i]] = mat
   }
 }
 ```
@@ -156,8 +156,8 @@ remove_subgroups = function(groups){
   return(groups)
 }
 compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0.6, thres_change = 0.01){
-  # data  = data.frame(cells$M1)
-  # cell = names(cells)[4]
+  #data  = data.frame(cells[[4]])
+  #cell = names(cells)[4]
   data = data.frame(data)
   if (ncol(data) < 2) {
     warning("Data must have at least two columns for subgrouping.")
@@ -256,18 +256,232 @@ compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0
           if(vec[1] %in% corr_df$measure1){ #Check if feature still no-grouped
             tab = corr_df[corr_df$measure1 == vec[1],] #Take one feature against the others
             tab = tab[tab$r>thres_corr,] #Select features corr above the threshold = 0.75
-            if(indice>1){
-              idx = which(tab$measure1 %in% subgroup[[indice-1]])
-              idy = which(tab$measure2 %in% subgroup[[indice-1]])
-              if(length(idx)>0){tab = tab[-idx,]} #Remove features already subgroupped    
-              if(length(idy)>0){tab = tab[-idy,]} #Remove features already subgroupped    
-            }
             if(nrow(tab)!=0){ #If algorithm found features above corr
+              if(indice>1){
+                idx = which(tab$measure1 %in% subgroup[[indice-1]])
+                idy = which(tab$measure2 %in% subgroup[[indice-1]])
+                if(length(idx)>0){tab = tab[-idx,]} #Remove features already subgroupped    
+                if(length(idy)>0){tab = tab[-idy,]} #Remove features already subgroupped    
+              }
               subgroup[[indice]] = c(vec[1], tab$measure2) #Save features as subgroup
               vec = vec[-which(vec%in%subgroup[[indice]])] #Remove feature already subgroupped from vector  
               indice = indice + 1
             }else{ #Condition when there is no correlation above the threshold (features no subgroupped)
               corr_df = corr_df[-which(corr_df$measure1 == vec[1]),] #Remove variable from corr matrix to keep subgrouping the others
+              vec = vec[-1] #Remove variable from vector to keep analyzing the others 
+              indice = indice #Not increase index cause no subgroup appeared
+            }
+          }else{ #If feature is not in corr matrix it means that there is no any significant correlation against it and other features 
+            vec = vec[-1] #Remove variable from vector to keep analyzing the others
+            indice = indice  #Not increase index cause no subgroup appeared
+          }
+        }
+        
+        if(length(subgroup)!=0){
+          #Name subgroups
+          if(iteration > 1){
+            idx = c()
+            for (i in 1:length(subgroup)) {
+              for(j in 1:length(subgroup[[i]])){
+                idx = as.numeric(c(idx, str_split(subgroup[[i]], "_")[[j]][3]))
+              }
+            }
+            for (i in 1:length(subgroup)){ 
+              names(subgroup)[i] = paste0(cell, "_Subgroup_", paste0(idx, collapse = "."))
+            }
+          }else{
+            for (i in 1:length(subgroup)){ 
+              names(subgroup)[i] = paste0(cell, "_Subgroup_", i)
+            }
+            cell_subgroups = subgroup 
+          }
+          
+          #Take average expression of subgroups
+          for(i in 1:length(subgroup)){ #Create data frame with features subgroupped
+            sub = data.frame(data[,colnames(data)%in%subgroup[[i]]]) #Map features that are inside each subgroup from input (deconvolution)
+            sub$average = rowMeans(sub) #Compute average of subgroup across patients 
+            data_sub = data.frame(cbind(data_sub, sub$average)) #Save avg in a new data frame
+            colnames(data_sub)[i] = names(subgroup)[i]
+            name = colnames(data)[which(!(colnames(data)%in%subgroup[[i]]))]
+            data = data.frame(data[,-which(colnames(data)%in%subgroup[[i]])]) #Remove from deconvolution features that are subgrouped
+            if(ncol(data.frame(data))==1){
+              data = as.data.frame(data)
+              colnames(data)[1] = name
+            }
+          }
+          
+          rownames(data_sub) = rownames(data) #List of patients
+          
+          new_average_values = colMeans(data.matrix(data_sub))
+          
+          if(iteration == 1){
+            data_sub = data.frame(data_sub[,colnames(data_sub)%in%names(cell_subgroups)])
+            colnames(data_sub) = names(cell_subgroups)
+          }
+          
+          #Compare averages and test if they are above certain threshold 
+          if(iteration == 1){
+            df = data
+          }else{
+            for (i in 1:length(subgroup)) {
+              for (j in 1:length(idx)) {
+                change = max(abs(average_values[idx[j]] - new_average_values[i]))
+                if (change > thres_change) {
+                  terminate <- TRUE
+                }
+              }
+            }
+          }
+          average_values = new_average_values
+          
+          if(ncol(data_sub)>1){
+            data = data_sub
+          }else{
+            terminate = TRUE
+          }
+          iteration = iteration + 1
+        }else{
+          terminate = TRUE
+          if(!is.null(tryCatch(eval(parse(text = df)), error = function(e) NULL))==F){
+            df = data
+          }
+        }
+        
+      }
+      
+      if(is.null(data_sub)==TRUE){
+        data = cbind(df, data)
+      }else{
+        data = cbind(df, data, data_sub)
+      }
+      
+      idx = which(duplicated(t(data)))
+      if(length(idx)>0){
+        data = data[,-idx]
+      }
+    }
+    
+    
+    return(list(data, cell_subgroups, subgroup, lis))
+  }
+  
+}
+```
+
+```{r}
+compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0.6, thres_change = 0.01){
+  #data  = data.frame(cells[[4]]) 
+  #cell = names(cells)[4]
+  data = data.frame(data)
+  if (ncol(data) < 2) {
+    warning("Data must have at least two columns for subgrouping.")
+    cell_subgroups = list()
+    subgroup = list()
+    lis = c()
+    return(list(data, cell_subgroups, subgroup, lis))
+  }else{
+    cell_subgroups = list()
+    lis = list()
+    ###################################################################################################################Similarity part  
+    is_similar <- function(value1, value2, threshold) {return(abs(value1 - value2) <= threshold)}
+    similarity_matrix <- matrix(FALSE, nrow = ncol(data), ncol = ncol(data), dimnames = list(names(data), names(data)))
+    for (col1 in names(data)) {
+      for (col2 in names(data)) {
+        similarity <- all(mapply(is_similar, data[[col1]], data[[col2]], MoreArgs = list(thres_similarity)))
+        similarity_matrix[col1, col2] <- similarity
+      }
+    }
+    # Get upper triangle of the correlation matrix
+    get_upper_tri <- function(cormat){
+      cormat[lower.tri(cormat, diag = T)]<- NA
+      return(cormat)
+    }
+    
+    upper_tri <- get_upper_tri(similarity_matrix)
+    x <- melt(upper_tri) %>%
+      na.omit() %>%
+      mutate_all(as.character)
+    indice = 1
+    subgroup = list()
+    vec = unique(x$Var1)
+    while(length(vec)>0){
+      sub = x[which(x$Var1%in%vec[1]),] 
+      sub = sub[which(sub$value==T),]
+      if(nrow(sub)!=0){
+        subgroup[[indice]] = c(vec[1], sub$Var2)
+        x = x[-which(x$Var1%in%subgroup[[indice]]),]
+        x = x[-which(x$Var2%in%subgroup[[indice]]),]
+        vec = vec[-which(vec%in%subgroup[[indice]])]
+        indice = indice + 1
+      }else{
+        indice = indice
+        vec = vec[-1]
+      }
+    }
+    
+    if(length(subgroup)!=0){
+      #Name subgroups    
+      for (i in 1:length(subgroup)){ 
+        names(subgroup)[i] = paste0(cell, "_Subgroup.Similarity", i)
+      }
+      
+      lis = remove_subgroups(subgroup)
+      data_sub = c()
+      #Take average expression of subgroups
+      for(i in 1:length(subgroup)){ #Create data frame with features subgroupped
+        sub = data.frame(data[,colnames(data)%in%subgroup[[i]]]) #Map features that are inside each subgroup from input (deconvolution)
+        sub$average = rowMeans(sub) #Compute average of subgroup across patients 
+        data_sub = data.frame(cbind(data_sub, sub$average)) #Save avg in a new data frame
+        colnames(data_sub)[i] = names(subgroup)[i]
+        name = colnames(data)[which(!(colnames(data)%in%subgroup[[i]]))]
+        data = data[,-which(colnames(data)%in%subgroup[[i]])] #Remove from deconvolution features that are subgrouped
+        if(ncol(data.frame(data))==1){
+          data = as.data.frame(data)
+          colnames(data)[1] = name
+        }
+      }
+      
+      rownames(data_sub) = rownames(data) #List of patients
+      data_sub = data.frame(data_sub[,colnames(data_sub)%in%names(lis)])
+      colnames(data_sub) = names(lis)
+      
+      data = cbind(data, data_sub) #Join subgroups in deconvolution file
+      k = 2
+    }else{
+      k = 3
+    }
+    
+    if(ncol(data) == 1){
+      cell_subgroups = list()
+      return(list(data, cell_subgroups, subgroup, lis))  
+    }
+    ###################################################################################################################Correlation part
+    
+    if(k==2 | k==3){
+      terminate = FALSE
+      iteration = 1
+      while (terminate == FALSE) {
+        corr_df <- correlation(data.matrix(data))
+        vec = colnames(data)
+        indice = 1
+        subgroup = list()
+        data_sub = c() 
+        while(length(vec)>0){ #Keep running until no features are left
+          if(vec[1] %in% corr_df$measure1){ #Check if feature still no-grouped
+            tab = corr_df[corr_df$measure1 == vec[1],] #Take one feature against the others
+            tab = tab[tab$r>thres_corr,] #Select features corr above the threshold = 0.75
+            if(nrow(tab)!=0){ #If algorithm found features above corr
+              subgroup[[indice]] = c(vec[1], tab$measure2) #Save features as subgroup
+              idx = which(corr_df$measure1 %in% subgroup[[indice]])
+              idy = which(corr_df$measure2 %in% subgroup[[indice]])
+              if(length(idx)>0){corr_df = corr_df[-idx,]} #Remove features already subgroupped    
+              if(length(idy)>0){corr_df = corr_df[-idy,]} #Remove features already subgroupped
+              #corr_df = corr_df[-which(corr_df$measure1 %in% subgroup[[indice]]),] #Remove features already subgroupped
+              vec = vec[-which(vec%in%subgroup[[indice]])] #Remove feature already subgroupped from vector  
+              indice = indice + 1
+            }else{ #Condition when there is no correlation above the threshold (features no subgroupped)
+              corr_df = corr_df[-which(corr_df$measure1 == vec[1]),] #Remove variable from corr matrix to keep subgrouping the others
+              if(length(which(corr_df$measure2==vec[1]))>0){corr_df = corr_df[-which(corr_df$measure2 == vec[1]),]}
               vec = vec[-1] #Remove variable from vector to keep analyzing the others 
               indice = indice #Not increase index cause no subgroup appeared
             }
