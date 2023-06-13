@@ -17,7 +17,10 @@ dataset = "LPVan"
 ```
 
 ```{r}
-deconv <- read.delim("~/Downloads/all_deconvolutions_Counts_LPVan_TPM.txt", row.names=1)
+deconv <- as.matrix(read.delim("~/Downloads/all_deconvolutions_Counts_LPVan_TPM.txt", row.names=1))
+clinical.data = read.csv("~/LungPredict/ClinicalLPVan.csv", row.names=1)
+clinical.data = clinical.data[-which(clinical.data$Batch==6),]
+deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
 ```
 
 ```{r}
@@ -25,15 +28,12 @@ deconv <- read.delim("~/Downloads/all_deconvolutions_Counts_LPVan_TPM.txt", row.
 deconv <- deconv[,-grep("MCP", colnames(deconv))]
 #Removing CD226
 deconv <- deconv[,-grep("CD226", colnames(deconv))]
-#Filtering equal method-signatures (corr=1)
-deconv = data.matrix(deconv[,-which(duplicated(t(deconv)))])
-#Remove columns with low variance
-#deconv = data.frame(deconv[,-which(colVars(deconv)<=summary(colVars(deconv))[2])])
-#Remove columns with more than 90% of zeros
+#Remove columns with low variance (no much change across samples)
+deconv = data.frame(deconv[,-which(colVars(deconv)<=summary(colVars(deconv))[2])])
+#Remove columns with more than 80% of zeros
 i <- colSums(deconv == 0, na.rm=TRUE) < round(0.7*nrow(deconv))
 deconv <- data.frame(deconv[, i, drop=FALSE])
 ```
-
 
 ```{r}
 compute_cell.types = function(data){
@@ -112,9 +112,9 @@ compute_cell.types = function(data){
   
   CAF = data[,grep("CAF", colnames(data))]
   
-  cell_types = list(B, Macrophages, M0, M1, M2, Monocytes, Neutrophils, NK, NK.activated, NK.resting, NKT, CD4, CD4.activated, CD4.resting, CD4.naive, CD4.non.regulatory,
-                    CD8, Tregs, Dendritic, Dendritic.activated, Dendritic.resting, Cancer, Endothelial, CAF)
-  names(cell_types) = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", "CD4.NAIVE", "CD4.NON.REGULATORY",
+  cell_types = list(B, Macrophages, M0, M1, M2, Monocytes, Neutrophils, NK, NK.activated, NK.resting, NKT, CD4, CD4.activated, CD4.resting, CD8, Tregs, Dendritic, Dendritic.activated,
+                    Dendritic.resting, Cancer, Endothelial, CAF)
+  names(cell_types) = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", 
                         "CD8", "TREGS", "DENDRITIC", "DENDRITIC.ACTIVATED", "DENDRITIC.RESTING", "CANCER", "ENDOTHELIAL", "CAF")
   
   return(cell_types)
@@ -124,13 +124,24 @@ cells = compute_cell.types(data.frame(deconv))
 ```
 
 ```{r}
+#Pairwise correlation
+removeCorrelatedFeatures <- function(data, threshold = 0.95) {
+  # Compute correlation matrix
+  corr_matrix <- cor(data)
+  # Find highly correlated features
+  high_corr_pairs <- findCorrelation(corr_matrix, cutoff = threshold, names = TRUE)
+  # Select only the variables to keep
+  new_data <- data.frame(data[, -which(colnames(data)%in%high_corr_pairs)])
+  if(ncol(new_data)==1){
+    colnames(new_data)[1] = colnames(data)[1]
+  }
+  return(new_data)
+}
 for (i in 1:length(cells)) {
   data = cells[[i]]
-  if(ncol(data)!=0){
-    idx = which(colVars(as.matrix(data))<=summary(colVars(as.matrix(data)))[2])
-    mat = data.frame(data[,-idx])
-    if(ncol(mat)==1){colnames(mat)[1] = names(cells[[i]])[-idx]}
-    cells[[i]] = mat
+  if(ncol(data)>1){
+    data = removeCorrelatedFeatures(data)
+    cells[[i]] = data
   }
 }
 ```
@@ -141,237 +152,27 @@ remove_subgroups = function(groups){
   lis = c()
   for (pos in 1:length(groups)){
     x = c()
-    for (i in 1:length(groups[[pos]])) {
-      x =  c(x,str_split(groups[[pos]][[i]], "_")[[1]][1])
-    }
-    if(length(unique(x)) == 1){
-      lis = c(lis, names(groups)[[pos]])
-    }
-  }
-  
-  if(length(lis)>0){
-    groups = groups[-which(names(groups)%in%lis)]
-  }
-  
-  return(groups)
-}
-compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0.6, thres_change = 0.01){
-  #data  = data.frame(cells[[4]])
-  #cell = names(cells)[4]
-  data = data.frame(data)
-  if (ncol(data) < 2) {
-    warning("Data must have at least two columns for subgrouping.")
-    cell_subgroups = list()
-    subgroup = list()
-    lis = c()
-    return(list(data, cell_subgroups, subgroup, lis))
-  }else{
-    cell_subgroups = list()
-    lis = list()
-    ###################################################################################################################Similarity part  
-    is_similar <- function(value1, value2, threshold) {return(abs(value1 - value2) <= threshold)}
-    similarity_matrix <- matrix(FALSE, nrow = ncol(data), ncol = ncol(data), dimnames = list(names(data), names(data)))
-    for (col1 in names(data)) {
-      for (col2 in names(data)) {
-        similarity <- all(mapply(is_similar, data[[col1]], data[[col2]], MoreArgs = list(thres_similarity)))
-        similarity_matrix[col1, col2] <- similarity
-      }
-    }
-    # Get upper triangle of the correlation matrix
-    get_upper_tri <- function(cormat){
-      cormat[lower.tri(cormat, diag = T)]<- NA
-      return(cormat)
-    }
-    
-    upper_tri <- get_upper_tri(similarity_matrix)
-    x <- melt(upper_tri) %>%
-      na.omit() %>%
-      mutate_all(as.character)
-    indice = 1
-    subgroup = list()
-    vec = unique(x$Var1)
-    while(length(vec)>0){
-      sub = x[which(x$Var1%in%vec[1]),] 
-      sub = sub[which(sub$value==T),]
-      if(nrow(sub)!=0){
-        subgroup[[indice]] = c(vec[1], sub$Var2)
-        x = x[-which(x$Var1%in%subgroup[[indice]]),]
-        x = x[-which(x$Var2%in%subgroup[[indice]]),]
-        vec = vec[-which(vec%in%subgroup[[indice]])]
-        indice = indice + 1
-      }else{
-        indice = indice
-        vec = vec[-1]
-      }
-    }
-    
-    if(length(subgroup)!=0){
-      #Name subgroups    
-      for (i in 1:length(subgroup)){ 
-        names(subgroup)[i] = paste0(cell, "_Subgroup.Similarity", i)
-      }
-      
-      lis = remove_subgroups(subgroup)
-      data_sub = c()
-      #Take average expression of subgroups
-      for(i in 1:length(subgroup)){ #Create data frame with features subgroupped
-        sub = data.frame(data[,colnames(data)%in%subgroup[[i]]]) #Map features that are inside each subgroup from input (deconvolution)
-        sub$average = rowMeans(sub) #Compute average of subgroup across patients 
-        data_sub = data.frame(cbind(data_sub, sub$average)) #Save avg in a new data frame
-        colnames(data_sub)[i] = names(subgroup)[i]
-        name = colnames(data)[which(!(colnames(data)%in%subgroup[[i]]))]
-        data = data[,-which(colnames(data)%in%subgroup[[i]])] #Remove from deconvolution features that are subgrouped
-        if(ncol(data.frame(data))==1){
-          data = as.data.frame(data)
-          colnames(data)[1] = name
+    if(length(groups[[pos]])!=0){
+      for (i in 1:length(groups[[pos]])) {
+        for (j in 1:length(groups[[pos]][[i]])) {
+          x =  c(x,str_split(groups[[pos]][[i]], "_")[[j]][[1]])
         }
+        if(length(unique(x)) == 1){lis = c(lis, names(groups[[pos]])[[i]])}
       }
-      
-      rownames(data_sub) = rownames(data) #List of patients
-      data_sub = data.frame(data_sub[,colnames(data_sub)%in%names(lis)])
-      colnames(data_sub) = names(lis)
-      
-      data = cbind(data, data_sub) #Join subgroups in deconvolution file
-      k = 2
+
     }else{
-      k = 3
+      pos = pos+1
     }
-    
-    if(ncol(data) == 1){
-      cell_subgroups = list()
-      return(list(data, cell_subgroups, subgroup, lis))  
-    }
-    ###################################################################################################################Correlation part
-    
-    if(k==2 | k==3){
-      terminate = FALSE
-      iteration = 1
-      while (terminate == FALSE) {
-        corr_df <- correlation(data.matrix(data))
-        vec = colnames(data)
-        indice = 1
-        subgroup = list()
-        data_sub = c() 
-        while(length(vec)>0){ #Keep running until no features are left
-          if(vec[1] %in% corr_df$measure1){ #Check if feature still no-grouped
-            tab = corr_df[corr_df$measure1 == vec[1],] #Take one feature against the others
-            tab = tab[tab$r>thres_corr,] #Select features corr above the threshold = 0.75
-            if(nrow(tab)!=0){ #If algorithm found features above corr
-              if(indice>1){
-                idx = which(tab$measure1 %in% subgroup[[indice-1]])
-                idy = which(tab$measure2 %in% subgroup[[indice-1]])
-                if(length(idx)>0){tab = tab[-idx,]} #Remove features already subgroupped    
-                if(length(idy)>0){tab = tab[-idy,]} #Remove features already subgroupped    
-              }
-              subgroup[[indice]] = c(vec[1], tab$measure2) #Save features as subgroup
-              vec = vec[-which(vec%in%subgroup[[indice]])] #Remove feature already subgroupped from vector  
-              indice = indice + 1
-            }else{ #Condition when there is no correlation above the threshold (features no subgroupped)
-              corr_df = corr_df[-which(corr_df$measure1 == vec[1]),] #Remove variable from corr matrix to keep subgrouping the others
-              vec = vec[-1] #Remove variable from vector to keep analyzing the others 
-              indice = indice #Not increase index cause no subgroup appeared
-            }
-          }else{ #If feature is not in corr matrix it means that there is no any significant correlation against it and other features 
-            vec = vec[-1] #Remove variable from vector to keep analyzing the others
-            indice = indice  #Not increase index cause no subgroup appeared
-          }
-        }
-        
-        if(length(subgroup)!=0){
-          #Name subgroups
-          if(iteration > 1){
-            idx = c()
-            for (i in 1:length(subgroup)) {
-              for(j in 1:length(subgroup[[i]])){
-                idx = as.numeric(c(idx, str_split(subgroup[[i]], "_")[[j]][3]))
-              }
-            }
-            for (i in 1:length(subgroup)){ 
-              names(subgroup)[i] = paste0(cell, "_Subgroup_", paste0(idx, collapse = "."))
-            }
-          }else{
-            for (i in 1:length(subgroup)){ 
-              names(subgroup)[i] = paste0(cell, "_Subgroup_", i)
-            }
-            cell_subgroups = subgroup 
-          }
-          
-          #Take average expression of subgroups
-          for(i in 1:length(subgroup)){ #Create data frame with features subgroupped
-            sub = data.frame(data[,colnames(data)%in%subgroup[[i]]]) #Map features that are inside each subgroup from input (deconvolution)
-            sub$average = rowMeans(sub) #Compute average of subgroup across patients 
-            data_sub = data.frame(cbind(data_sub, sub$average)) #Save avg in a new data frame
-            colnames(data_sub)[i] = names(subgroup)[i]
-            name = colnames(data)[which(!(colnames(data)%in%subgroup[[i]]))]
-            data = data.frame(data[,-which(colnames(data)%in%subgroup[[i]])]) #Remove from deconvolution features that are subgrouped
-            if(ncol(data.frame(data))==1){
-              data = as.data.frame(data)
-              colnames(data)[1] = name
-            }
-          }
-          
-          rownames(data_sub) = rownames(data) #List of patients
-          
-          new_average_values = colMeans(data.matrix(data_sub))
-          
-          if(iteration == 1){
-            data_sub = data.frame(data_sub[,colnames(data_sub)%in%names(cell_subgroups)])
-            colnames(data_sub) = names(cell_subgroups)
-          }
-          
-          #Compare averages and test if they are above certain threshold 
-          if(iteration == 1){
-            df = data
-          }else{
-            for (i in 1:length(subgroup)) {
-              for (j in 1:length(idx)) {
-                change = max(abs(average_values[idx[j]] - new_average_values[i]))
-                if (change > thres_change) {
-                  terminate <- TRUE
-                }
-              }
-            }
-          }
-          average_values = new_average_values
-          
-          if(ncol(data_sub)>1){
-            data = data_sub
-          }else{
-            terminate = TRUE
-          }
-          iteration = iteration + 1
-        }else{
-          terminate = TRUE
-          if(!is.null(tryCatch(eval(parse(text = df)), error = function(e) NULL))==F){
-            df = data
-          }
-        }
-        
-      }
-      
-      if(is.null(data_sub)==TRUE){
-        data = cbind(df, data)
-      }else{
-        data = cbind(df, data, data_sub)
-      }
-      
-      idx = which(duplicated(t(data)))
-      if(length(idx)>0){
-        data = data[,-idx]
-      }
-    }
-    
-    
-    return(list(data, cell_subgroups, subgroup, lis))
   }
   
+  return(lis)
 }
 ```
 
 ```{r}
-compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0.6, thres_change = 0.01){
-  #data  = data.frame(cells[[4]]) 
-  #cell = names(cells)[4]
+compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0.7, thres_change = 0.01){
+  # data  = data.frame(cells[[2]])
+  # cell = names(cells)[2]
   data = data.frame(data)
   if (ncol(data) < 2) {
     warning("Data must have at least two columns for subgrouping.")
@@ -422,10 +223,20 @@ compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0
     if(length(subgroup)!=0){
       #Name subgroups    
       for (i in 1:length(subgroup)){ 
-        names(subgroup)[i] = paste0(cell, "_Subgroup.Similarity", i)
+        names(subgroup)[i] = paste0(cell, "_Subgroup.Similarity_", i)
       }
       
       lis = remove_subgroups(subgroup)
+      #Groups similarity
+      if(length(lis)>0){
+        for (i in 1:length(subgroup)) {
+          idx = which(names(subgroup[[i]])%in%lis)
+          if(length(idx)>0){
+            subgroup[[i]] = subgroup[[i]][-idx]  
+          }
+        }
+      }
+      lis = subgroup
       data_sub = c()
       #Take average expression of subgroups
       for(i in 1:length(subgroup)){ #Create data frame with features subgroupped
@@ -473,8 +284,8 @@ compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0
             if(nrow(tab)!=0){ #If algorithm found features above corr
               subgroup[[indice]] = c(vec[1], tab$measure2) #Save features as subgroup
               idx = which(corr_df$measure1 %in% subgroup[[indice]])
+              if(length(idx)>0){corr_df = corr_df[-idx,]} #Remove features already subgroupped 
               idy = which(corr_df$measure2 %in% subgroup[[indice]])
-              if(length(idx)>0){corr_df = corr_df[-idx,]} #Remove features already subgroupped    
               if(length(idy)>0){corr_df = corr_df[-idy,]} #Remove features already subgroupped
               #corr_df = corr_df[-which(corr_df$measure1 %in% subgroup[[indice]]),] #Remove features already subgroupped
               vec = vec[-which(vec%in%subgroup[[indice]])] #Remove feature already subgroupped from vector  
@@ -493,21 +304,8 @@ compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0
         
         if(length(subgroup)!=0){
           #Name subgroups
-          if(iteration > 1){
-            idx = c()
-            for (i in 1:length(subgroup)) {
-              for(j in 1:length(subgroup[[i]])){
-                idx = as.numeric(c(idx, str_split(subgroup[[i]], "_")[[j]][3]))
-              }
-            }
-            for (i in 1:length(subgroup)){ 
-              names(subgroup)[i] = paste0(cell, "_Subgroup_", paste0(idx, collapse = "."))
-            }
-          }else{
-            for (i in 1:length(subgroup)){ 
-              names(subgroup)[i] = paste0(cell, "_Subgroup_", i)
-            }
-            cell_subgroups = subgroup 
+          for (i in 1:length(subgroup)){ 
+            names(subgroup)[i] = paste0(cell, "_Subgroup_", i, "_Iteration_", iteration)
           }
           
           #Take average expression of subgroups
@@ -526,56 +324,63 @@ compute_subgroups = function(data, cell, thres_similarity = 0.05, thres_corr = 0
           
           rownames(data_sub) = rownames(data) #List of patients
           
-          new_average_values = colMeans(data.matrix(data_sub))
+          # new_average_values = colMeans(data.matrix(data_sub))
           
-          if(iteration == 1){
+          if(iteration == 1){ #Save what is inside the first subgroups
+            cell_subgroups = subgroup 
             data_sub = data.frame(data_sub[,colnames(data_sub)%in%names(cell_subgroups)])
             colnames(data_sub) = names(cell_subgroups)
           }
           
-          #Compare averages and test if they are above certain threshold 
-          if(iteration == 1){
-            df = data
-          }else{
-            for (i in 1:length(subgroup)) {
-              for (j in 1:length(idx)) {
-                change = max(abs(average_values[idx[j]] - new_average_values[i]))
-                if (change > thres_change) {
-                  terminate <- TRUE
-                }
-              }
-            }
-          }
-          average_values = new_average_values
+          # #Compare averages and test if they are above certain threshold 
+          # if(iteration == 1){
+          #   df = data
+          # }
+          #else{
+          #   for (i in 1:length(subgroup)) {
+          #     for (j in 1:length(idx)) {
+          #       change = max(abs(average_values[idx[j]] - new_average_values[i]))
+          #       if (change > thres_change) {
+          #         terminate <- TRUE
+          #       }
+          #     }
+          #   }
+          # }
+          # average_values = new_average_values
           
-          if(ncol(data_sub)>1){
-            data = data_sub
+          if(ncol(data)!=0){
+            data = cbind(data, data_sub)
           }else{
+            data = data_sub
             terminate = TRUE
           }
           iteration = iteration + 1
         }else{
           terminate = TRUE
-          if(!is.null(tryCatch(eval(parse(text = df)), error = function(e) NULL))==F){
-            df = data
-          }
+          #if(!is.null(tryCatch(eval(parse(text = df)), error = function(e) NULL))==F){
+          #df = data
+          #}
         }
         
       }
       
       if(is.null(data_sub)==TRUE){
-        data = cbind(df, data)
+        data = data
       }else{
-        data = cbind(df, data, data_sub)
+        data = cbind(data, data_sub)
       }
       
       idx = which(duplicated(t(data)))
       if(length(idx)>0){
-        data = data[,-idx]
+        names = colnames(data)[idx]
+        data = data.frame(data[,-idx])
+        if(ncol(data)==1){
+         colnames(data)[1] = names 
+        }
       }
     }
     
-    
+    #lis = remove_subgroups(cell
     return(list(data, cell_subgroups, subgroup, lis))
   }
   
@@ -592,23 +397,203 @@ for (i in 1:length(cells)) {
   groups = c(groups, x[2])
   groups_similarity = c(groups_similarity, x[4])
 }
-names_cells = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", "CD4.NAIVE", "CD4.NON.REGULATORY",
+names_cells = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", 
                         "CD8", "TREGS", "DENDRITIC", "DENDRITIC.ACTIVATED", "DENDRITIC.RESTING", "CANCER", "ENDOTHELIAL", "CAF")
 names(res) = names_cells
 names(groups) = names_cells
 names(groups_similarity) = names_cells
-#Joining subgroups in a new deconvolution output
+
+#Res and Groups 
+ls = remove_subgroups(groups)
+for (i in 1:length(groups)) {
+  idx = which(names(groups[[i]])%in%ls)
+  idy = which(names(res[[i]])%in%ls)
+  if(length(idx)>0){
+    groups[[i]] = groups[[i]][-idx] 
+    res[[i]] = res[[i]][-idy] 
+  }
+}
+
+#Output deconvolution
 dt = c()
 for (i in 1:length(res)) {
   dt = c(dt, res[[i]])
 }
 dt = data.frame(dt)
 rownames(dt) = rownames(deconv)
+
 ```
 
 ```{r}
 png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(dt)), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
+```
+```{r}
+dataset = "LungPredict"
+colData_LP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+LP = dt[rownames(dt)%in%rownames(colData_LP),]
+colData_LP = colData_LP[rownames(colData_LP)%in%rownames(LP),]
+hc1 = as.dendrogram(hclust(dist(scale(LP)), method = "ward.D2"))
+plot(hc1)
+rect.dendrogram(hc1, k=2,horiz=F)
+clusters <- cutree(hc1, k=2)
+colData_LP$cluster = NULL
+colData_LP$cluster = clusters
+random_forest <- function(data, target, k_features) {
+  # Step 1: Random Forest Feature Selection
+  target = as.factor(target)
+  # Step 2: Random Forest Classification
+  rf_classifier <- randomForest(target ~ ., data = data)
+  rf_importance <- importance(rf_classifier)
+  rf_importance <- rf_importance[order(rf_importance, decreasing = TRUE), ]
+  rf_selected_features <- data[, names(rf_importance[order(rf_importance, decreasing = TRUE)][1:k_features])]
+  rf_importance = data.frame(rf_importance)
+  colnames(rf_importance)[1] = "Importance"
+  return(list(rf_selected_features, rf_importance))
+}
+
+res = random_forest(LP, colData_LP$cluster, 20)
+
+ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(x = "Features", y = "Importance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+hclu = hclust(dist(t(scale(res[[1]]))), method = "ward.D2")
+vec = hclu[["order"]]
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP_FS_JOINED.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = colData_LP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
+Heatmap(t(scale(res[[1]][,vec])), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+```
+
+```{r}
+dataset = "Vanderbilt"
+colData_Van <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+Van = dt[rownames(dt)%in%rownames(colData_Van),]
+Van = Van[,colnames(Van)%in%colnames(res[[1]])]
+colData_Van = colData_Van[rownames(colData_Van)%in%rownames(Van),]
+
+names = colnames(res[[1]][,vec])
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionVan_FS_JOINED.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(Van[, names])), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+```
+```{r}
+dataset = "LPVan"
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
+data = t(TFs)
+
+###Choose Soft Threshold (power) parameter
+powers = c(c(1:10), seq(from = 12, to = 20, by = 2))
+sft = pickSoftThreshold(data, powerVector = powers, verbose = 5)
+print(plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+    xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+    main = paste("Scale independence")))
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], labels=powers,cex=0.9,col="red")
+abline(h=0.90,col="red")
+
+```
+
+```{r}
+cor <- WGCNA::cor
+picked_power = 12
+netwk <- blockwiseModules(data,
+                          power = picked_power,
+                          networkType = "signed",
+                          deepSplit = 2,
+                          pamRespectsDendro = F,
+                          minModuleSize = 5,
+                          reassignThreshold = 0,
+                          mergeCutHeight = 0.15,
+                          numericLabels = T,
+                          verbose = 3)
+mergedColors = labels2colors(netwk$colors)
+module_df <- data.frame(gene_id = names(netwk$colors),
+                        colors = paste0("ME", labels2colors(netwk$colors))) 
+
+###Get Module eigengenes per cluster
+nGenes = ncol(data)
+nSamples = nrow(data)
+MEs0 <- moduleEigengenes(data, mergedColors)$eigengenes
+MEs0 <- orderMEs(MEs0)
+hubgenes = chooseTopHubInEachModule(data, mergedColors)
+module_order = names(MEs0) %>% gsub("ME","", .)
+MEs0$treatment = row.names(MEs0)
+MEs0$treatment = NULL  
+
+###Merge TFs modules
+height = 1.2 #Vanderbilt parameter
+d <- dist(t(MEs0))
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+clusters <- cutree(hc1, h = 1)
+hc = as.dendrogram(hc1)
+avg_col_dend <- color_branches(hc, h = height)
+png(paste0(getwd(),"/Figures/WGCNA/Dendogram_Modules_TFs_", dataset, ".png"), width = 2500, height = 2500, res=150)
+par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
+plot(hc, horiz= T)
+rect.dendrogram(hc, h=1,horiz=TRUE)
+dev.off()
+
+MEs0_merge = MEs0 %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+
+
+```
+
+Relate results with features
+```{r}
+MEs0_merge = MEs0_merge[,colnames(MEs0_merge)%in%rownames(dt)]
+moduleTraitCor = cor(t(MEs0_merge), dt, use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
+
+textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
+                  signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+  
+idx = which(moduleTraitPvalue>0.05)
+for (i in idx) {
+  textMatrix[i] = NA
+}
+
+d <- dist(t(moduleTraitCor), method = "euclidean")
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+  
+###Figure module-trait relationship
+png(paste0(getwd(),"//Figures/Heatmaps/New2/Module_trait_relationships_", dataset, ".png"), width = 3500, height = 1500, res=150)
+par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
+labeledHeatmap(Matrix = moduleTraitCor[,vec],
+               xLabels = names(dt[,vec]),
+               yLabels = rownames(MEs0_merge),
+               ySymbols = rownames(MEs0_merge),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix[,vec],
+               setStdMargins = FALSE,
+               cex.text = 0.8,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+
+#Modules filtering 
+#1. Remove high correlate modules
+#2. Remove low correlated modules with features
+#3. Remove modules that contains unconnected TFs
+vec = c("Cluster 12", "Cluster 13", "Cluster 14", "Cluster 3", "Cluster 8", "Cluster 9", "Cluster 1", "Cluster 4", "CLuster 5") #Lung Predict
+vec = c("Cluster 1", "Cluster 8") #Vanderbilt
+
+MEs0_merge = MEs0_merge[-which(rownames(MEs0_merge)%in%vec),]
 ```
 
