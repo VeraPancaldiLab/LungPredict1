@@ -1,5 +1,5 @@
 ---
-title: "ResponseAnalysis"
+title: "LateStage_Analysis"
 author: "Marcelo Hurtado"
 date: "2023-06-14"
 output: html_document
@@ -11,12 +11,19 @@ libraries_set()
 ```
 
 ```{r}
-dataset = "Response"
-```
+deconv1 <- as.matrix(read.csv(paste0(getwd(),"/Input/Deconvolution/Deconvolution_LungPredict.csv"), row.names = 1))
+clinical.data1 <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_LungPredict.csv"), row.names = 1)
+deconv2 <- as.matrix(read.csv(paste0(getwd(),"/Input/Deconvolution/Deconvolution_ImmunoPredict.csv"), row.names = 1))
+clinical.data2 <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_ImmunoPredict.csv"), row.names = 1)
 
-```{r}
-deconv <- as.matrix(read.csv(paste0(getwd(),"/Input/Deconvolution/Deconvolution_", dataset, ".csv"), row.names = 1))
-clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+clinical.data1$EGFR_mut = NULL
+clinical.data1$STK11_mut = NULL
+clinical.data1$Metastatic = NULL
+
+clinical.data = rbind(clinical.data1, clinical.data2)
+clinical.data = clinical.data[which(clinical.data$Stages_simplified=="IV"),] #38 SAMPLES
+
+deconv = rbind(deconv1, deconv2)
 deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
 ```
 
@@ -420,13 +427,14 @@ rownames(dt) = rownames(deconv)
 ```
 
 ```{r}
-png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionRESPONSE.png"), width = 6000, height = 4500, res=250)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLATESTAGE.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(dt)), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
-Input data
+Input data TFs
 ```{r}
 dataset = "Response"
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
 TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
 ```
 
