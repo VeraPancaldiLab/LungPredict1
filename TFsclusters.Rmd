@@ -137,7 +137,7 @@ dev.off()
 deconv_df = dt %>%
   t() %>%
   as_tibble() %>%
-  mutate("Cluster" = paste0("Cluster ", clusters3)) %>%
+  mutate("Cluster" = paste0("Cluster_", clusters3)) %>%
   group_by(Cluster) %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
@@ -179,9 +179,39 @@ random_forest <- function(data, target, k_features) {
 
 res = random_forest(data.frame(LP), colData_LP$cluster, 10)
 
+hclu = hclust(dist(t(scale(res[[1]]))), method = "ward.D2")
+vec = hclu[["order"]]
+
 png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP_FS_JOINED_TFs.png"), width = 6000, height = 4500, res=250)
 ha <- HeatmapAnnotation(Cluster = colData_LP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
-Heatmap(t(scale(res[[1]])),  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+Heatmap(t(scale(res[[1]][,vec])), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
+```{r}
+data = dt %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = clusters3) %>%
+  as.data.frame()
+rownames(data) = colnames(dt)
+niches = list()
+for (i in 1:nrow(deconv_df)) {
+  niches[[i]] = rownames(data)[which(data$Cluster==i)]
+}
+```
+
+```{r}
+dataset = "Vanderbilt"
+data = t(deconv_df)
+colData_Van <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+Van = data[rownames(data)%in%rownames(colData_Van),]
+Van = Van[,colnames(Van)%in%colnames(res[[1]])]
+colData_Van = colData_Van[rownames(colData_Van)%in%rownames(Van),]
+
+names = colnames(res[[1]][,vec])
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionVan_FS_JOINED_TFs.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(Van[, names])), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
 dev.off()
 ```
 
