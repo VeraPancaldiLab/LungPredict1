@@ -152,19 +152,19 @@ dev.off()
 ```{r}
 dataset = "LungPredict"
 colData_LP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
-LP = deconv_df[,colnames(deconv_df)%in%rownames(colData_LP)]
-colData_LP = colData_LP[rownames(colData_LP)%in%colnames(LP),]
-hc1 = as.dendrogram(hclust(dist(scale(t(LP))), method = "ward.D2"))
+data = t(deconv_df)
+LP = data[rownames(data)%in%rownames(colData_LP),]
+colData_LP = colData_LP[rownames(colData_LP)%in%rownames(LP),]
+hc1 = as.dendrogram(hclust(dist(scale(LP)), method = "ward.D2"))
 plot(hc1)
 rect.dendrogram(hc1, k=2,horiz=F)
 clusters <- cutree(hc1, k=2)
 colData_LP$cluster = NULL
 colData_LP$cluster = clusters
-LP = t(LP)
 
 random_forest <- function(data, target, k_features) {
-  data = LP
-  target = colData_LP$cluster
+  # data = LP
+  # target = colData_LP$cluster
   # Step 1: Random Forest Feature Selection
   target = as.factor(target)
   # Step 2: Random Forest Classification
@@ -177,6 +177,11 @@ random_forest <- function(data, target, k_features) {
   return(list(rf_selected_features, rf_importance))
 }
 
-res = random_forest(LP, colData_LP$cluster, 10)
+res = random_forest(data.frame(LP), colData_LP$cluster, 10)
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP_FS_JOINED_TFs.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = colData_LP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
+Heatmap(t(scale(res[[1]])),  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
 ```
 
