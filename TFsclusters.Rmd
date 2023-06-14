@@ -179,6 +179,11 @@ random_forest <- function(data, target, k_features) {
 
 res = random_forest(data.frame(LP), colData_LP$cluster, 10)
 
+ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(x = "Features", y = "Importance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 hclu = hclust(dist(t(scale(res[[1]]))), method = "ward.D2")
 vec = hclu[["order"]]
 
@@ -213,5 +218,11 @@ names = colnames(res[[1]][,vec])
 png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionVan_FS_JOINED_TFs.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(Van[, names])), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
 dev.off()
+```
+
+```{r}
+dataset = "Response"
+response <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+response = response[rownames(response)%in%rownames(dt),]
 ```
 
