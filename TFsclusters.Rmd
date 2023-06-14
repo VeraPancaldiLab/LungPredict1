@@ -122,13 +122,61 @@ hc = as.dendrogram(hc1)
 png(paste0(getwd(),"/Figures/Heatmaps/New2/Dendogram_Subgroups_cells_", dataset, ".png"), width = 2500, height = 2500, res=150)
 par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
 plot(hc, horiz= T)
-rect.dendrogram(hc, h=0.5,horiz=TRUE)
+rect.dendrogram(hc, h=0.8,horiz=TRUE)
+dev.off()
+
+clusters3 <- cutree(hc, h = 0.8)
+```
+
+```{r}
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP_TFs.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(dt)), cluster_rows = hc, clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
+```
+```{r}
+deconv_df = dt %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters3)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+```
+
+```{r}
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP_Clusters.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(t(deconv_df))), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
 
 ```{r}
-png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(dt)), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
-dev.off()
+dataset = "LungPredict"
+colData_LP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+LP = deconv_df[,colnames(deconv_df)%in%rownames(colData_LP)]
+colData_LP = colData_LP[rownames(colData_LP)%in%colnames(LP),]
+hc1 = as.dendrogram(hclust(dist(scale(t(LP))), method = "ward.D2"))
+plot(hc1)
+rect.dendrogram(hc1, k=2,horiz=F)
+clusters <- cutree(hc1, k=2)
+colData_LP$cluster = NULL
+colData_LP$cluster = clusters
+LP = t(LP)
+
+random_forest <- function(data, target, k_features) {
+  data = LP
+  target = colData_LP$cluster
+  # Step 1: Random Forest Feature Selection
+  target = as.factor(target)
+  # Step 2: Random Forest Classification
+  rf_classifier <- randomForest(target ~ ., data = data)
+  rf_importance <- importance(rf_classifier)
+  rf_importance <- rf_importance[order(rf_importance, decreasing = TRUE), ]
+  rf_selected_features <- data[, names(rf_importance[order(rf_importance, decreasing = TRUE)][1:k_features])]
+  rf_importance = data.frame(rf_importance)
+  colnames(rf_importance)[1] = "Importance"
+  return(list(rf_selected_features, rf_importance))
+}
+
+res = random_forest(LP, colData_LP$cluster, 10)
 ```
 
