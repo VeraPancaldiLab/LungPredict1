@@ -6,12 +6,15 @@ output: html_document
 ---
 
 ```{r}
+dataset = "LPVan"
 TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
 ```
 
 ```{r}
 #Remove columns with low variance (no much change across samples)
 TFs = data.frame(TFs[-which(rowVars(TFs)<=summary(rowVars(TFs))[2]),])
+minAbsValue <- abs(min(TFs))
+TFs = TFs + minAbsValue
 ```
 
 ```{r}
@@ -41,11 +44,11 @@ projected_data <- data %*% selected_eigenvec
 
 # Step 6: Perform hierarchical clustering on the projected data
 projected_data = TFs
-hc <- as.dendrogram(hclust(dist(t(scale(projected_data))), method = "ward.D2"))
+hc <- as.dendrogram(hclust(dist(t(scale(t(projected_data)))), method = "ward.D2"))
 plot(hc)
-rect.dendrogram(hc, h = 18,horiz=F)
+rect.dendrogram(hc, h = 20,horiz=F)
 
-clusters <- cutree(hc, h = 18)
+clusters <- cutree(hc, h = 20)
 
 # Print the clusters
 print(clusters)
@@ -54,9 +57,20 @@ print(clusters)
 
 ```{r}
 TFs_modules = projected_data %>%
-  t() %>%
   as_tibble() %>%
   mutate("Cluster" = paste0("Cluster ", clusters)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+
+hc <- as.dendrogram(hclust(dist(t(scale(t(TFs_modules)))), method = "ward.D2"))
+plot(hc)
+rect.dendrogram(hc, h = 10,horiz=F)
+clusters2 <- cutree(hc, h = 10)
+
+TFs_modules_merge = TFs_modules %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters2)) %>%
   group_by(Cluster) %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
@@ -64,13 +78,13 @@ TFs_modules = projected_data %>%
 
 ```{r}
 png(paste0(getwd(),"/Figures/Heatmaps/New2/TFs_modules.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(t(TFs_modules))), clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"))
+Heatmap(t(scale(t(TFs_modules_merge))), clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"))
 dev.off()
 ```
 
 ```{r}
-TFs_modules = TFs_modules[,colnames(TFs_modules)%in%rownames(dt)]
-moduleTraitCor = cor(t(TFs_modules), dt, use = "p")
+TFs_modules_merge = TFs_modules_merge[,colnames(TFs_modules_merge)%in%rownames(dt)]
+moduleTraitCor = cor(t(TFs_modules_merge), dt, use = "p")
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
 
 textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
@@ -87,12 +101,12 @@ hc1 <- hclust(d, method = "ward.D2" )
 vec = hc1[["order"]]
   
 ###Figure module-trait relationship
-png(paste0(getwd(),"//Figures/Heatmaps/New2/Module_trait_relationships_", dataset, ".png"), width = 3500, height = 1500, res=150)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Module_trait_relationships_", dataset, ".png"), width = 3500, height = 1500, res=150)
 par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
 labeledHeatmap(Matrix = moduleTraitCor[,vec],
                xLabels = names(dt[,vec]),
-               yLabels = rownames(TFs_modules),
-               ySymbols = rownames(TFs_modules),
+               yLabels = rownames(TFs_modules_merge),
+               ySymbols = rownames(TFs_modules_merge),
                colorLabels = FALSE,
                colors = blueWhiteRed(50),
                textMatrix = textMatrix[,vec],
@@ -100,6 +114,21 @@ labeledHeatmap(Matrix = moduleTraitCor[,vec],
                cex.text = 0.8,
                zlim = c(-1,1),
                main = paste("Module-trait relationships"))
+dev.off()
+```
+```{r}
+hc = as.dendrogram(hc1)
+###Figure dendogram cell types based on TFs activity 
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Dendogram_Subgroups_cells_", dataset, ".png"), width = 2500, height = 2500, res=150)
+par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
+plot(hc, horiz= T)
+rect.dendrogram(hc, h=0.5,horiz=TRUE)
+dev.off()
+```
+
+```{r}
+png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLP.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(dt)), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
 
