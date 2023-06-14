@@ -343,7 +343,8 @@ Counts = Counts[,colnames(Counts) %in% rownames(response)]
 clinical.data = clinical.data[rownames(clinical.data)%in%rownames(response),]
 deconv = deconv[rownames(deconv)%in%rownames(response),]
 
-#Add information 
+#Add information (order samples)
+response = response[rownames(clinical.data),]
 clinical.data$response = response$Response
 
 #Save data files
