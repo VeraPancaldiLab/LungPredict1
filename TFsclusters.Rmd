@@ -1,0 +1,105 @@
+---
+title: "TFsClustering"
+author: "Marcelo Hurtado"
+date: "2023-06-14"
+output: html_document
+---
+
+```{r}
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
+```
+
+```{r}
+#Remove columns with low variance (no much change across samples)
+TFs = data.frame(TFs[-which(rowVars(TFs)<=summary(rowVars(TFs))[2]),])
+```
+
+```{r}
+data = t(TFs)
+# Step 1: Compute the covariance or correlation matrix
+cov_matrix <- cov(data)  # Or use cor(data) for correlation matrix
+
+# Step 2: Perform eigenvalue decomposition
+eigen_decomp <- eigen(cov_matrix)
+
+# Step 3: Sort eigenvectors by eigenvalues in descending order
+sorted_eigenvec <- eigen_decomp$vectors[, order(eigen_decomp$values, decreasing = TRUE)]
+data = data[,order(eigen_decomp$values, decreasing = TRUE)]
+colnames(sorted_eigenvec) = colnames(data)
+rownames(sorted_eigenvec) = colnames(data)
+
+# Step 4: Select a subset of top eigenvectors
+total_variance <- sum(eigen_decomp$values)
+explained_variance <- cumsum(eigen_decomp$values) / total_variance
+
+# Select eigenvectors that explain a significant portion of the variance
+threshold <- 0.9
+selected_eigenvec <- sorted_eigenvec[, explained_variance >= threshold]
+
+# Step 5: Project original data onto selected eigenvectors
+projected_data <- data %*% selected_eigenvec
+
+# Step 6: Perform hierarchical clustering on the projected data
+projected_data = TFs
+hc <- as.dendrogram(hclust(dist(t(scale(projected_data))), method = "ward.D2"))
+plot(hc)
+rect.dendrogram(hc, h = 18,horiz=F)
+
+clusters <- cutree(hc, h = 18)
+
+# Print the clusters
+print(clusters)
+
+```
+
+```{r}
+TFs_modules = projected_data %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+```
+
+```{r}
+png(paste0(getwd(),"/Figures/Heatmaps/New2/TFs_modules.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(t(TFs_modules))), clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"))
+dev.off()
+```
+
+```{r}
+TFs_modules = TFs_modules[,colnames(TFs_modules)%in%rownames(dt)]
+moduleTraitCor = cor(t(TFs_modules), dt, use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
+
+textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
+                  signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+  
+idx = which(moduleTraitPvalue>0.05)
+for (i in idx) {
+  textMatrix[i] = NA
+}
+
+d <- dist(t(moduleTraitCor), method = "euclidean")
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+  
+###Figure module-trait relationship
+png(paste0(getwd(),"//Figures/Heatmaps/New2/Module_trait_relationships_", dataset, ".png"), width = 3500, height = 1500, res=150)
+par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
+labeledHeatmap(Matrix = moduleTraitCor[,vec],
+               xLabels = names(dt[,vec]),
+               yLabels = rownames(TFs_modules),
+               ySymbols = rownames(TFs_modules),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix[,vec],
+               setStdMargins = FALSE,
+               cex.text = 0.8,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+```
+
