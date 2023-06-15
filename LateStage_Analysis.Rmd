@@ -32,7 +32,7 @@ deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
 deconv <- deconv[,-grep("CD226", colnames(deconv))]
 #Remove columns with low variance (no much change across samples)
 deconv = data.frame(deconv[,-which(colVars(deconv)<=summary(colVars(deconv))[2])])
-#Remove columns with more than 80% of zeros
+#Remove columns with more than 70% of zeros
 i <- colSums(deconv == 0, na.rm=TRUE) < round(0.7*nrow(deconv))
 deconv <- data.frame(deconv[, i, drop=FALSE])
 ```
@@ -127,7 +127,7 @@ cells = compute_cell.types(data.frame(deconv))
 
 ```{r}
 #Pairwise correlation
-removeCorrelatedFeatures <- function(data, threshold = 0.95) {
+removeCorrelatedFeatures <- function(data, threshold = 0.9) {
   # Compute correlation matrix
   corr_matrix <- cor(data)
   # Find highly correlated features
@@ -172,7 +172,7 @@ remove_subgroups = function(groups){
 ```
 
 ```{r}
-compute_subgroups = function(data, name, thres_similarity = 0.05, thres_corr = 0.7, thres_change = 0.01){
+compute_subgroups = function(data, file_name, thres_similarity = 0.05, thres_corr = 0.65, thres_change = 0.01){
   # data  = data.frame(cells[[2]])
   # cell = names(cells)[2]
   data = data.frame(data)
@@ -225,7 +225,7 @@ compute_subgroups = function(data, name, thres_similarity = 0.05, thres_corr = 0
     if(length(subgroup)!=0){
       #Name subgroups    
       for (i in 1:length(subgroup)){ 
-        names(subgroup)[i] = paste0(name, "_Subgroup.Similarity_", i)
+        names(subgroup)[i] = paste0(file_name, "_Subgroup.Similarity_", i)
       }
       
       lis = remove_subgroups(subgroup)
@@ -307,7 +307,7 @@ compute_subgroups = function(data, name, thres_similarity = 0.05, thres_corr = 0
         if(length(subgroup)!=0){
           #Name subgroups
           for (i in 1:length(subgroup)){ 
-            names(subgroup)[i] = paste0(name, "_Subgroup_", i, "_Iteration_", iteration)
+            names(subgroup)[i] = paste0(file_name, "_Subgroup_", i, "_Iteration_", iteration)
           }
           
           #Take average expression of subgroups
@@ -424,18 +424,11 @@ for (i in 1:length(res)) {
 dt = data.frame(dt)
 rownames(dt) = rownames(deconv)
 
-```
-
-```{r}
-png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionLATESTAGE.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(dt)), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
-dev.off()
+write.csv(dt, "Deconvolution_after_LATE_STAGE.csv")
 ```
 Input data TFs
 ```{r}
-dataset = "Response"
-TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
-TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_LateStage.csv"), row.names = 1)
 ```
 
 TFs filtering
@@ -448,16 +441,15 @@ TFs = TFs + minAbsValue
 
 Finding modules of TFs
 ```{r}
-projected_data = TFs
-hc <- as.dendrogram(hclust(dist(t(scale(t(projected_data)))), method = "ward.D2"))
+hc <- as.dendrogram(hclust(dist(t(scale(t(TFs)))), method = "ward.D2"))
 plot(hc)
-rect.dendrogram(hc, h = 20,horiz=F)
-clusters <- cutree(hc, h = 20)
+rect.dendrogram(hc, h = 15,horiz=F)
+clusters <- cutree(hc, h = 15)
 ```
 
 TFs clustering merging
 ```{r}
-TFs_modules = projected_data %>%
+TFs_modules = TFs %>%
   as_tibble() %>%
   mutate("Cluster" = paste0("Cluster ", clusters)) %>%
   group_by(Cluster) %>%
@@ -476,15 +468,13 @@ TFs_modules_merge = TFs_modules %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
-png(paste0(getwd(),"/Figures/Heatmaps/New2/TFs_modules_RESPONSE.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(t(TFs_modules_merge))), clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"))
-dev.off()
+write.csv(TFs_modules_merge, "TFs_modules_LATE_STAGE.csv")
 ```
 
 Correlating deconvolution with TFs activity
 ```{r}
-nSamples = ncol(TFs)
-TFs_modules_merge = TFs_modules_merge[,colnames(TFs_modules_merge)%in%rownames(dt)]
+nSamples = ncol(TFs_modules_merge)
+TFs_modules_merge = TFs_modules_merge[,colnames(TFs_modules_merge)%in%rownames(clinical.data)]
 moduleTraitCor = cor(t(TFs_modules_merge), dt, use = "p")
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
 
@@ -502,26 +492,26 @@ hc1 <- hclust(d, method = "ward.D2" )
 vec = hc1[["order"]]
   
 ###Figure module-trait relationship
-png(paste0(getwd(),"/Figures/Heatmaps/New2/Module_trait_relationships_", dataset, ".png"), width = 3500, height = 1500, res=150)
-par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
-labeledHeatmap(Matrix = moduleTraitCor[,vec],
-               xLabels = names(dt[,vec]),
-               yLabels = rownames(TFs_modules_merge),
-               ySymbols = rownames(TFs_modules_merge),
-               colorLabels = FALSE,
-               colors = blueWhiteRed(50),
-               textMatrix = textMatrix[,vec],
-               setStdMargins = FALSE,
-               cex.text = 0.8,
-               zlim = c(-1,1),
-               main = paste("Module-trait relationships"))
-dev.off()
+# png(paste0(getwd(),"/Figures/Heatmaps/New3/Module_trait_relationships_LATESTAGE.png"), width = 3500, height = 1500, res=150)
+# par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
+# labeledHeatmap(Matrix = moduleTraitCor[,vec],
+#                xLabels = names(dt[,vec]),
+#                yLabels = rownames(TFs_modules_merge),
+#                ySymbols = rownames(TFs_modules_merge),
+#                colorLabels = FALSE,
+#                colors = blueWhiteRed(50),
+#                textMatrix = textMatrix[,vec],
+#                setStdMargins = FALSE,
+#                cex.text = 0.8,
+#                zlim = c(-1,1),
+#                main = paste("Module-trait relationships"))
+# dev.off()
 ```
 
 Figure dendogram cell types based on TFs activity 
 ```{r}
 hc = as.dendrogram(hc1)
-png(paste0(getwd(),"/Figures/Heatmaps/New2/Dendogram_Subgroups_cells_", dataset, ".png"), width = 2500, height = 2500, res=150)
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Dendogram_Subgroups_cells_LATESTAGE.png"), width = 2500, height = 2500, res=150)
 par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
 plot(hc, horiz= T)
 rect.dendrogram(hc, h=0.5,horiz=TRUE)
@@ -529,7 +519,7 @@ dev.off()
 
 clusters3 <- cutree(hc, h = 0.5)
 
-png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionRESPONSE_TFs.png"), width = 6000, height = 4500, res=250)
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(dt)), cluster_rows = hc, clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
@@ -544,11 +534,191 @@ deconv_df = dt %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
-col = clinical.data[-which(clinical.data$response=="No data"),]
-deconv_df2 = deconv_df[,colnames(deconv_df)%in%rownames(col)]
-png(paste0(getwd(),"/Figures/Heatmaps/New2/DeconvolutionRESPONSE_Clusters.png"), width = 6000, height = 4500, res=250)
-ha <- HeatmapAnnotation(Response = col$response, col = list(Response = c("Responders" = "green", "Non responders"= "red")))
-Heatmap(t(scale(t(deconv_df2))), clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE_NICHES.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(t(deconv_df))), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
+
+#Save cell clusters
+data = dt %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = clusters3) %>%
+  as.data.frame()
+rownames(data) = colnames(dt)
+niches = list()
+for (i in 1:nrow(deconv_df)) {
+  niches[[i]] = rownames(data)[which(data$Cluster==i)]
+}
+
+saveRDS(niches, "Cell_groups_LATESTAGE.rds")
+```
+
+Random Forest
+```{r}
+hc1 = as.dendrogram(hclust(dist(scale(t(deconv_df))), method = "ward.D2"))
+plot(hc1)
+rect.dendrogram(hc1, k=2,horiz=F)
+clusters <- cutree(hc1, k=2)
+clinical.data$cluster = NULL
+clinical.data$cluster = clusters
+
+random_forest <- function(data, target, k_features) {
+  # Step 1: Random Forest Feature Selection
+  target = as.factor(target)
+  # Step 2: Random Forest Classification
+  rf_classifier <- randomForest(target ~ ., data = data)
+  rf_importance <- importance(rf_classifier)
+  rf_importance <- rf_importance[order(rf_importance, decreasing = TRUE), ]
+  rf_selected_features <- data[, names(rf_importance[order(rf_importance, decreasing = TRUE)][1:k_features])]
+  rf_importance = data.frame(rf_importance)
+  colnames(rf_importance)[1] = "Importance"
+  return(list(rf_selected_features, rf_importance))
+}
+
+data = t(deconv_df)
+res = random_forest(data.frame(data), clinical.data$cluster, 10)
+
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Clusters_Feature_Importance_LATESTAGE.png"), width = 2000, height = 1500, res=250)
+ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(x = "Features", y = "Importance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+dev.off()
+
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE_TFs_CLUSTERS.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = clinical.data$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
+Heatmap(t(scale(res[[1]])),  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
+Including Response
+```{r}
+response <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_Response.csv"), row.names = 1)
+response = response[rownames(response)%in%rownames(clinical.data),]
+
+clinical.data = clinical.data[rownames(clinical.data)%in%rownames(response),]
+deconv_df = deconv_df[,colnames(deconv_df)%in%rownames(clinical.data)]
+clinical.data$response = response$response
+
+clinical.data = clinical.data[-which(clinical.data$response=="No data"),]
+deconv_df = deconv_df[,colnames(deconv_df)%in%rownames(clinical.data)]
+
+dat = res[[1]]
+dat = dat[rownames(dat)%in%rownames(clinical.data),]
+
+ha <- HeatmapAnnotation(Response = clinical.data$response, col = list(Response = c("Responders" = "green", "Non responders"= "red")))
+png(paste0(getwd(),"/Figures/Heatmaps/New3/DeconvolutionLATESTAGE_RESPONSE_Clusters.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(dat)), clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 
 ```
+========================================================
+
+```{r}
+dataset = "ImmunoPredict"
+colData_IP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+data = t(deconv_df)
+IP = data[rownames(data)%in%rownames(colData_IP),]
+colData_IP = colData_IP[rownames(colData_IP)%in%rownames(IP),]
+hc1 = as.dendrogram(hclust(dist(scale(IP)), method = "ward.D2"))
+plot(hc1)
+rect.dendrogram(hc1, k=2,horiz=F)
+clusters <- cutree(hc1, k=2)
+colData_IP$cluster = NULL
+colData_IP$cluster = clusters
+
+res = random_forest(data.frame(IP), colData_IP$cluster, 10)
+
+#Add response
+response <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_Response.csv"), row.names = 1)
+response = response[rownames(response)%in%rownames(colData_IP),]
+colData_IP = colData_IP[rownames(colData_IP)%in%rownames(response),]
+colData_IP$Response = response$response
+
+dat = res[[1]]
+dat = dat[rownames(dat)%in%rownames(colData_IP),]
+
+ha <- HeatmapAnnotation(Response = colData_IP$Response, Cluster = colData_IP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple"),
+                                                                                                    Response = c("Responders" = "green", "Non responders"= "red")))
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_IP_LATESTAGE_FS_CLUSTERS_RESPONSE.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(dat)), clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
+```
+
+========================================================
+
+Features selection with bootstrapping
+```{r}
+
+random_forest_boostrapping = function(data, clinical, num_bootstraps, k_features){
+  # Create empty lists to store the bootstrap results
+  bootstrap_results <- list()
+  df_responders = clinical[which(clinical$response=="Responders"),]
+  df_Non_responders = clinical[which(clinical$response=="Non responders"),]
+  # Perform random bootstrapping
+  for (i in 1:num_bootstraps) {
+    # Create a bootstrap sample
+    bootstrap_data <- rbind(df_responders, df_Non_responders[sample(nrow(df_Non_responders), size = 5, replace = FALSE), ])
+    target = as.factor(bootstrap_data[,'response'])
+    # Perform random forest classification
+    rf_classifier <- randomForest(target ~ ., data = data[rownames(data)%in%rownames(bootstrap_data),])
+    rf_importance <- importance(rf_classifier)
+    rf_importance <- rf_importance[order(rf_importance, decreasing = TRUE), ]
+    rf_selected_features <- data[, names(rf_importance[order(rf_importance, decreasing = TRUE)][1:k_features])]
+    # Store the random forest model in the bootstrap_results list
+    bootstrap_results[[i]] <- rf_selected_features
+    x = c()
+    for (i in 1:length(bootstrap_results)) {
+      x = c(x, names(bootstrap_results[[i]]))
+    }
+    intersection = unique(x)
+  }
+  
+  return(intersection)
+}
+
+response <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_Response.csv"), row.names = 1)
+response = response[rownames(response)%in%colnames(deconv_df),]
+clinical.data = clinical.data[rownames(clinical.data)%in%rownames(response),]
+dat = deconv_df[,colnames(deconv_df)%in%rownames(clinical.data)]
+clinical.data$response = response$response
+clinical.data = clinical.data[-which(clinical.data$response=="No data"),]
+dat = dat[,colnames(dat)%in%rownames(clinical.data)]
+
+res = random_forest_boostrapping(data.frame(t(dat)), clinical.data, 10, 5)
+data_response = dat[rownames(dat)%in%res,]
+
+png(paste0(getwd(),"/Figures/Heatmaps/New3/CLUSTERS_FS_RESPONSE_LATESTAGE.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Response = clinical.data$response, col = list(Response = c("Responders" = "green", "Non responders"= "red")))
+Heatmap(t(scale(t(data_response))),  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+
+```
+```{r}
+compute_violin = function(data, feature, file_name){
+  matrix = data 
+  feature = as.factor(feature)
+  #matrix = data.frame(data[1:nrow(data)-1,])
+  matrix$measure = feature
+  #pval = data[nrow(data),]
+  
+  for (i in (1:(ncol(matrix)-1))) {
+    violin = ggplot(matrix, aes(x=factor(measure), y=matrix[,i], fill=measure)) +
+      geom_violin(width=0.6) +
+      geom_boxplot(width=0.07, color="black", alpha=0.2) +
+      scale_fill_brewer() +
+      geom_smooth(aes(x=as.factor(measure), y=matrix[,i]), method = "loess") +
+      ylab(colnames(matrix[i])) +
+      xlab(file_name) +
+      #labs(title=colnames(matrix[i]),
+      #subtitle=paste0("ANOVA_RFE_RANDOM.FOREST test\npvalue: ", pval[i])) +
+      theme(axis.text.x = element_text(angle = 0),
+            axis.title.y = element_text(size = 8, angle = 90))
+    
+    
+    ggsave(violin, file=paste0(getwd(),"/Figures/Violin_plots/", colnames(matrix[i]), "_", file_name, ".png"))
+  }
+}
+compute_violin(data.frame(t(data_response)), clinical.data$response, "response")
+```
+
