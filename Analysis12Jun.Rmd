@@ -15,6 +15,26 @@ deconv <- as.matrix(read.delim("~/LungPredict1/all_deconvolutions_Counts_LPVan_T
 clinical.data = read.csv("~/LungPredict/ClinicalLPVan.csv", row.names=1)
 clinical.data = clinical.data[-which(clinical.data$Batch==6),]
 deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_before_EARLYSTAGE.png"), width = 6000, height = 7000, res=250)
+Heatmap(t(scale(deconv)), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(50, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/M2_EARLYSTAGE.png"), width = 6000, height = 4000, res=250)
+Heatmap(t(scale(cells$M2)), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/NK_EARLYSTAGE.png"), width = 6000, height = 4000, res=250)
+Heatmap(t(scale(cells$NK)), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/CD8_EARLYSTAGE.png"), width = 6000, height = 4000, res=250)
+Heatmap(t(scale(cells$CD8)), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/MONOCYTES_EARLYSTAGE.png"), width = 6000, height = 4000, res=250)
+Heatmap(t(scale(cells$MONOCYTES)), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
 ```
 
 ```{r}
@@ -416,6 +436,9 @@ for (i in 1:length(res)) {
 dt = data.frame(dt)
 rownames(dt) = rownames(deconv)
 
+saveRDS(groups, "Groups_cells_correlation_EARLYSTAGE.rds")
+saveRDS(groups_similarity, "Groups_cells_similarity_EARLYSTAGE.rds")
+
 write.csv(dt, "Deconvolution_after_EARLY_STAGE.csv")
 ```
 
@@ -436,8 +459,10 @@ TFs = TFs + minAbsValue
 Finding modules of TFs
 ```{r}
 hc <- as.dendrogram(hclust(dist(t(scale(t(TFs)))), method = "ward.D2"))
+png(paste0(getwd(),"/Figures/Heatmaps/New2/TFs_clusters_EARLYSTAGE.png"), width = 7500, height = 4500, res=250)
 plot(hc)
 rect.dendrogram(hc, h = 20,horiz=F)
+dev.off()
 clusters <- cutree(hc, h = 20)
 ```
 
@@ -486,20 +511,20 @@ hc1 <- hclust(d, method = "ward.D2" )
 vec = hc1[["order"]]
   
 # ###Figure module-trait relationship
-# png(paste0(getwd(),"/Figures/Heatmaps/New2/Module_trait_relationships_EARLYSTAGE.png"), width = 3500, height = 1500, res=150)
-# par(mar = c(20, 10, 4, 4)) #bottom, left, top, right
-# labeledHeatmap(Matrix = moduleTraitCor[,vec],
-#                xLabels = names(dt[,vec]),
-#                yLabels = rownames(TFs_modules_merge),
-#                ySymbols = rownames(TFs_modules_merge),
-#                colorLabels = FALSE,
-#                colors = blueWhiteRed(50),
-#                textMatrix = textMatrix[,vec],
-#                setStdMargins = FALSE,
-#                cex.text = 0.8,
-#                zlim = c(-1,1),
-#                main = paste("Module-trait relationships"))
-# dev.off()
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Module_trait_relationships_EARLYSTAGE.png"), width = 4000, height = 1500, res=150)
+par(mar = c(20, 20, 4, 4)) #bottom, left, top, right
+labeledHeatmap(Matrix = moduleTraitCor[,vec],
+               xLabels = names(dt[,vec]),
+               yLabels = rownames(TFs_modules_merge),
+               ySymbols = rownames(TFs_modules_merge),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix[,vec],
+               setStdMargins = FALSE,
+               cex.text = 0.6,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
 ```
 
 Figure dendogram cell types based on TFs activity 
@@ -555,8 +580,10 @@ data = t(deconv_df)
 LP = data[rownames(data)%in%rownames(colData_LP),]
 colData_LP = colData_LP[rownames(colData_LP)%in%rownames(LP),]
 hc1 = as.dendrogram(hclust(dist(scale(LP)), method = "ward.D2"))
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Patients_clusters_EARLYSTAGE.png"), width = 2500, height = 1500, res=150)
 plot(hc1)
 rect.dendrogram(hc1, k=2,horiz=F)
+dev.off()
 clusters <- cutree(hc1, k=2)
 colData_LP$cluster = NULL
 colData_LP$cluster = clusters

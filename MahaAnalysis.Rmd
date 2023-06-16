@@ -1,0 +1,38 @@
+---
+title: "MahaAnalysis"
+author: "Marcelo Hurtado"
+date: "2023-06-16"
+output: html_document
+---
+
+Early stage groups
+```{r}
+res = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Cell_groups_EARLYSTAGE.rds"))
+groups_corr = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Groups_cells_correlation_EARLYSTAGE.rds"))
+groups_simi = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Groups_cells_similarity_EARLYSTAGE.rds"))
+```
+
+```{r}
+for (i in 1:length(groups_corr)) {
+  if(length(groups_corr[[i]])!=0){
+    for (j in 1:length(groups_corr[[i]])) {
+      if(length(groups_simi[[i]])!=0){
+        for (k in 1:length(groups_simi[[i]])) {
+          idx = which(groups_corr[[i]][[j]] %in% names(groups_simi[[i]][k]))
+          if(length(idx)>0){
+            groups_corr[[i]][[j]] = groups_corr[[i]][[j]][-idx]
+            groups_corr[[i]][[j]] = c(groups_corr[[i]][[j]], groups_simi[[i]])
+          }else{
+            groups_corr[[i]] = append(groups_corr[[i]], groups_simi[[i]][k])
+          }
+        }
+      }
+    }
+  }else{
+    if(length(groups_simi[[i]])!=0){
+      groups_corr[[i]] = groups_simi[[i]]
+    }
+  }
+}
+```
+
