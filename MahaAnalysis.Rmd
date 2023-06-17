@@ -7,32 +7,79 @@ output: html_document
 
 Early stage groups
 ```{r}
-res = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Cell_groups_EARLYSTAGE.rds"))
+cell_groups = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Cell_groups_EARLYSTAGE.rds"))
+res = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Groups_cells_all_EARLYSTAGE.rds"))
 groups_corr = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Groups_cells_correlation_EARLYSTAGE.rds"))
 groups_simi = readRDS(paste0(getwd(), "/Figures/Heatmaps/New2/Groups_cells_similarity_EARLYSTAGE.rds"))
 ```
 
 ```{r}
-for (i in 1:length(groups_corr)) {
-  if(length(groups_corr[[i]])!=0){
-    for (j in 1:length(groups_corr[[i]])) {
-      if(length(groups_simi[[i]])!=0){
-        for (k in 1:length(groups_simi[[i]])) {
-          idx = which(groups_corr[[i]][[j]] %in% names(groups_simi[[i]][k]))
-          if(length(idx)>0){
-            groups_corr[[i]][[j]] = groups_corr[[i]][[j]][-idx]
-            groups_corr[[i]][[j]] = c(groups_corr[[i]][[j]], groups_simi[[i]])
-          }else{
-            groups_corr[[i]] = append(groups_corr[[i]], groups_simi[[i]][k])
-          }
-        }
-      }
-    }
-  }else{
-    if(length(groups_simi[[i]])!=0){
-      groups_corr[[i]] = groups_simi[[i]]
+deconv <- read.csv(paste0(getwd(), "/Input/Deconvolution/Deconvolution_Maha.csv"), row.names = 1, sep=",")
+```
+
+```{r}
+for (i in 1:length(groups_simi)) {
+  if(length(groups_simi[[i]])!=0){
+    for (j in 1:length(groups_simi[[i]])) {
+      idx = which(colnames(deconv)%in%groups_simi[[i]][[j]])
+      sub = data.frame(deconv[,idx]) 
+      sub$average = rowMeans(sub) 
+      deconv = deconv[,-idx]
+      deconv <- deconv %>%
+        mutate(new_column = sub$average) %>%
+        rename(!!names(groups_simi[[i]][j]) := new_column)
     }
   }
 }
+
+for (i in 1:length(groups_corr)) {
+  if(length(groups_corr[[i]])!=0){
+    for (j in 1:length(groups_corr[[i]])) {
+      idx = which(colnames(deconv)%in%groups_corr[[i]][[j]])
+      sub = data.frame(deconv[,idx]) 
+      sub$average = rowMeans(sub) 
+      deconv = deconv[,-idx]
+      deconv <- deconv %>%
+        mutate(new_column = sub$average) %>%
+        rename(!!names(groups_corr[[i]][j]) := new_column)
+    }
+  }
+}
+
+data = data.frame()
+deconv_df <- data.frame(matrix(ncol = 0, nrow = 18))
+for (i in 1:length(res)) {
+  idx = which(colnames(deconv)%in%names(res[[i]]))
+  if(length(idx)>0){
+    data = data.frame(deconv[,idx])
+    if(ncol(data)==1){
+      colnames(data)[1] = names(res[[i]])
+    }
+    deconv_df = cbind(deconv_df, data)
+  }
+}
+```
+
+```{r}
+for (i in 1:length(cell_groups)) {
+  idx = which(colnames(deconv_df)%in%cell_groups[[i]])
+  sub = data.frame(deconv_df[,idx]) 
+  sub$average = rowMeans(sub) 
+  deconv_df = deconv_df[,-idx]
+  deconv_df <- deconv_df %>%
+    mutate(new_column = sub$average) %>%
+    rename(!!paste0("Cluster_", i) := new_column)
+}
+```
+
+```{r}
+clinical.data <- read.csv(paste0(getwd(), "/Input/ClinicalData/ClinicalData_Maha.csv"), row.names = 1, sep=",")
+```
+
+```{r}
+ha <- HeatmapAnnotation(Response = clinical.data$Response, col = list(Response = c("Responders" = "green", "Non responders"= "red")))
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Maha.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(deconv_df)), clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
 ```
 

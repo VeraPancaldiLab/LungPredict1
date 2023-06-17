@@ -185,8 +185,6 @@ remove_subgroups = function(groups){
 
 ```{r}
 compute_subgroups = function(data, file_name, thres_similarity = 0.05, thres_corr = 0.65, thres_change = 0.01){
-  # data  = data.frame(cells[[2]])
-  # cell = names(cells)[2]
   data = data.frame(data)
   if (ncol(data) < 2) {
     warning("Data must have at least two columns for subgrouping.")
@@ -436,6 +434,7 @@ for (i in 1:length(res)) {
 dt = data.frame(dt)
 rownames(dt) = rownames(deconv)
 
+saveRDS(res, "Groups_cells_all_EARLYSTAGE.rds")
 saveRDS(groups, "Groups_cells_correlation_EARLYSTAGE.rds")
 saveRDS(groups_similarity, "Groups_cells_similarity_EARLYSTAGE.rds")
 
