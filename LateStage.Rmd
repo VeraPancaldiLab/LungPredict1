@@ -539,6 +539,8 @@ deconv_df = dt %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
+write.csv(t(deconv_df), "Deconvolution_after_LATESTAGE_clusters.csv")
+
 png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE_NICHES.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(t(deconv_df))), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
@@ -607,6 +609,10 @@ clinical.data = clinical.data[rownames(clinical.data)%in%rownames(response),]
 clinical.data$response = response$response
 
 clinical.data = clinical.data[-which(clinical.data$response=="No data"),]
+data = data[rownames(data)%in%rownames(clinical.data),]
+
+write.csv(clinical.data, "colData_response.csv")
+write.csv(data, "Data_response.csv")
 
 dat = res[[1]]
 dat = dat[rownames(dat)%in%rownames(clinical.data),]
@@ -618,4 +624,8 @@ dev.off()
 
 ```
 
+```{r}
+RESPONSE <- read.csv("~/LungPredict1/Figures/Heatmaps/New3/Anova_response_LPIP.csv", row.names=1)
+compute_violin(RESPONSE, clinical.data$response, "Response_LPIP")
+```
 

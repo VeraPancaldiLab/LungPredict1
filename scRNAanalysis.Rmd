@@ -33,8 +33,7 @@ ColumnData_Vanderbilt = ColumnData_Vanderbilt[which(ColumnData_Vanderbilt$pt_ID 
 ```{r}
 # Dimensionality reduction
 pbmc <- NormalizeData(seurat_anndata, normalization.method = "LogNormalize", scale.factor = 10000)
-cll.combined = seurat_anndata
-cll.combined <- RunPCA(cll.combined, features = VariableFeatures(object = cll.combined), verbose = FALSE)
+cll.combined <- RunPCA(pbmc, features = VariableFeatures(object = pbmc), verbose = FALSE)
 print(cll.combined[["pca"]], dims = 1:5, nfeatures = 5)
 DimHeatmap(cll.combined, dims = 1, cells = 500, balanced = T)
 DimHeatmap(cll.combined, dims = 2, cells = 500, balanced = T)

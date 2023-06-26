@@ -531,6 +531,8 @@ deconv_df = dt %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
+write.csv(t(deconv_df), "Deconvolution_after_EARLYSTAGE_clusters.csv")
+
 png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_EARLYSTAGE_NICHES.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(t(deconv_df))), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()

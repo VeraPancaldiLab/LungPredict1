@@ -1,0 +1,138 @@
+---
+title: "MahaAnalysis"
+author: "Marcelo Hurtado"
+date: "2023-06-16"
+output: html_document
+---
+
+Early stage groups
+```{r}
+niches = readRDS(paste0(getwd(), "/Figures/Heatmaps/New3/Cell_groups_LATESTAGE.rds"))
+cell_groups = readRDS(paste0(getwd(), "/Figures/Heatmaps/New3/Cell_groups_LATESTAGE.rds"))
+res = readRDS(paste0(getwd(), "/Figures/Heatmaps/New3/Groups_cells_all_LATESTAGE.rds"))
+groups_corr = readRDS(paste0(getwd(), "/Figures/Heatmaps/New3/Groups_cells_correlation_LATESTAGE.rds"))
+groups_simi = readRDS(paste0(getwd(), "/Figures/Heatmaps/New3/Groups_cells_similarity_LATESTAGE.rds"))
+```
+
+```{r}
+deconv <- read.csv(paste0(getwd(), "/Input/Deconvolution/Deconvolution_Maha.csv"), row.names = 1, sep=",")
+```
+
+```{r}
+for (i in 1:length(groups_simi)) {
+  if(length(groups_simi[[i]])!=0){
+    for (j in 1:length(groups_simi[[i]])) {
+      idx = which(colnames(deconv)%in%groups_simi[[i]][[j]])
+      sub = data.frame(deconv[,idx]) 
+      sub$average = rowMeans(sub) 
+      deconv = deconv[,-idx]
+      deconv <- deconv %>%
+        mutate(new_column = sub$average) %>%
+        rename(!!names(groups_simi[[i]][j]) := new_column)
+    }
+  }
+}
+
+for (i in 1:length(groups_corr)) {
+  if(length(groups_corr[[i]])!=0){
+    for (j in 1:length(groups_corr[[i]])) {
+      idx = which(colnames(deconv)%in%groups_corr[[i]][[j]])
+      sub = data.frame(deconv[,idx]) 
+      sub$average = rowMeans(sub) 
+      deconv = deconv[,-idx]
+      deconv <- deconv %>%
+        mutate(new_column = sub$average) %>%
+        rename(!!names(groups_corr[[i]][j]) := new_column)
+    }
+  }
+}
+
+data = data.frame()
+deconv_df <- data.frame(matrix(ncol = 0, nrow = 18))
+for (i in 1:length(res)) {
+  idx = which(colnames(deconv)%in%names(res[[i]]))
+  if(length(idx)>0){
+    data = data.frame(deconv[,idx])
+    if(ncol(data)==1){
+      colnames(data)[1] = names(res[[i]])
+    }
+    deconv_df = cbind(deconv_df, data)
+  }
+}
+```
+
+```{r}
+for (i in 1:length(cell_groups)) {
+  idx = which(colnames(deconv_df)%in%cell_groups[[i]])
+  sub = data.frame(deconv_df[,idx]) 
+  sub$average = rowMeans(sub) 
+  deconv_df = deconv_df[,-idx]
+  deconv_df <- deconv_df %>%
+    mutate(new_column = sub$average) %>%
+    rename(!!paste0("Cluster_", i) := new_column)
+}
+```
+
+```{r}
+clinical.data <- read.csv(paste0(getwd(), "/Input/ClinicalData/ClinicalData_Maha.csv"), row.names = 1, sep=",")
+```
+
+```{r}
+ha <- HeatmapAnnotation(Response = clinical.data$Response, col = list(Response = c("Responders" = "green", "Non responders"= "red")))
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Maha.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(deconv_df)), clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
+```
+
+```{r}
+random_forest <- function(data, target, k_features) {
+  # Step 1: Random Forest Feature Selection
+  target = as.factor(target)
+  # Step 2: Random Forest Classification
+  rf_classifier <- randomForest(target ~ ., data = data)
+  rf_importance <- importance(rf_classifier)
+  rf_importance <- rf_importance[order(rf_importance, decreasing = TRUE), ]
+  rf_selected_features <- data[, names(rf_importance[order(rf_importance, decreasing = TRUE)][1:k_features])]
+  rf_importance = data.frame(rf_importance)
+  colnames(rf_importance)[1] = "Importance"
+  return(list(rf_selected_features, rf_importance))
+}
+
+ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(x = "Features", y = "Importance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+res = random_forest(deconv_df, clinical.data$Response, 10)
+
+png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_Maha_FS_CLUSTERS.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Response = clinical.data$Response, col = list(Response = c("Responders" = "green", "Non responders" = "red")))
+Heatmap(t(scale(res[[1]])), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
+```{r}
+compute_violin = function(data, feature, file_name){
+  
+  matrix = data.frame(data)
+  matrix$measure = feature
+  
+  for (i in (1:(ncol(matrix)))) {
+    violin = ggplot(matrix, aes(x=factor(measure), y=matrix[,i], fill=measure)) +
+      geom_violin(width=0.6) +
+      geom_boxplot(width=0.07, color="black", alpha=0.2) +
+      scale_fill_brewer() +
+      geom_smooth(aes(x=as.factor(measure), y=matrix[,i]), method = "loess") +
+      ylab(colnames(matrix[i])) +
+      xlab(file_name) +
+      labs(title=colnames(matrix[i])) +
+      theme(axis.text.x = element_text(angle = 0),
+            axis.title.y = element_text(size = 8, angle = 90))
+    
+    
+    ggsave(violin, file=paste0(getwd(),"/Figures/Heatmaps/New3/", colnames(matrix[i]), "_", file_name, ".png"))
+  }
+}
+
+compute_violin(res[[1]], clinical.data$Response, "Maha")
+```
+
