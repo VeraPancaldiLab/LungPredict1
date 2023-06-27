@@ -616,9 +616,13 @@ clinical.data = clinical.data[-which(clinical.data$response=="No data"),]
 dat = res[[1]]
 dat = dat[rownames(dat)%in%rownames(clinical.data),]
 
-ha <- HeatmapAnnotation(Cluster = clinical.data$cluster, Response = clinical.data$response, col = list(Cluster = c("1" = "green", "2" = "purple"), Response = c("Responders" = "green", "Non responders"= "red")))
+hclu = hclust(dist(t(scale(dat))), method = "ward.D2")
+plot(as.dendrogram(hclu))
+vec = hclu[["order"]]
+
+ha <- HeatmapAnnotation(Cluster = clinical.data$cluster, Response = clinical.data$response, col = list(Cluster = c("1" = "black", "2" = "purple"), Response = c("Responders" = "green", "Non responders"= "red")))
 png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE_FS_CLUSTERS_RESPONSE.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(dat)),  clustering_method_columns = "ward.D", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+Heatmap(t(scale(dat[,vec])),  column_split = clinical.data$cluster,  cluster_rows = F, clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 
 ```

@@ -14,7 +14,7 @@ groups_simi = readRDS(paste0(getwd(), "/Figures/Heatmaps/New3/Groups_cells_simil
 ```
 
 ```{r}
-deconv <- read.csv(paste0(getwd(), "/Input/Deconvolution/Deconvolution_Maha.csv"), row.names = 1, sep=",")
+#deconv <- read.csv(paste0(getwd(), "/Input/Deconvolution/Deconvolution_Maha.csv"), row.names = 1, sep=",")
 deconv <- read.delim("~/LungPredict1/Input/Deconvolution/all_deconvolutions_Counts_LPVan_TPM.txt", row.names=1)
 ```
 
@@ -74,7 +74,7 @@ for (i in 1:length(cell_groups)) {
 ```
 
 ```{r}
-clinical.data <- read.csv(paste0(getwd(), "/Input/ClinicalData/ClinicalData_Maha.csv"), row.names = 1, sep=",")
+#clinical.data <- read.csv(paste0(getwd(), "/Input/ClinicalData/ClinicalData_Maha.csv"), row.names = 1, sep=",")
 clinical.data = read.csv("~/LungPredict1/Input/ClinicalData/ClinicalLPVan.csv", row.names=1)
 
 clinical.data = clinical.data[-which(clinical.data$Batch==6),]
@@ -82,17 +82,35 @@ deconv_df = deconv_df[rownames(deconv_df)%in%rownames(clinical.data),]
 ```
 
 ```{r}
+idx = c("Cluster_4", "Cluster_17", "Cluster_16", "Cluster_20", "Cluster_15", "Cluster_9", "Cluster_14", "Cluster_12", "Cluster_13", "Cluster_5")
+deconv_df2 = deconv_df[,which(colnames(deconv_df)%in%idx)]
+deconv_df2 = deconv_df2[,vec2]
+
 #ha <- HeatmapAnnotation(Response = clinical.data$Response, col = list(Response = c("Responders" = "green", "Non responders"= "red")))
 png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(deconv_df)), clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+Heatmap(t(scale(deconv_df2)), cluster_rows=F,clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
 
 ```{r}
-hc1 = as.dendrogram(hclust(dist(scale(deconv_df)), method = "ward.D2"))
+dataset = "LungPredict"
+colData_LP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+data = t(deconv_df)
+LP = data[,colnames(data)%in%rownames(colData_LP)]
+colData_LP = colData_LP[rownames(colData_LP)%in%colnames(LP),]
+hc1 = as.dendrogram(hclust(dist(scale(t(LP))), method = "ward.D2"))
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Patients_clusters_EARLYSTAGE.png"), width = 2500, height = 1500, res=150)
+plot(hc1)
+rect.dendrogram(hc1, k=2,horiz=F)
+dev.off()
 clusters <- cutree(hc1, k=2)
-clinical.data$cluster = NULL
-clinical.data$cluster = clusters
+colData_LP$cluster = NULL
+colData_LP$cluster = clusters
+
+# hc1 = as.dendrogram(hclust(dist(scale(deconv_df)), method = "ward.D2"))
+# clusters <- cutree(hc1, k=2)
+# clinical.data$cluster = NULL
+# clinical.data$cluster = clusters
 
 random_forest <- function(data, target, k_features) {
   # Step 1: Random Forest Feature Selection
@@ -107,15 +125,24 @@ random_forest <- function(data, target, k_features) {
   return(list(rf_selected_features, rf_importance))
 }
 
-res = random_forest(deconv_df, clinical.data$cluster, 10)
+res = random_forest(data.frame(t(LP)), colData_LP$cluster, 10)
+#res = random_forest(deconv_df, clinical.data$cluster, 10)
 
 ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   labs(x = "Features", y = "Importance") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters_Top10.png"), width = 6000, height = 4500, res=250)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters_Top10_ONLYLP.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(res[[1]])), cluster_rows = F,  clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+hclu = hclust(dist(t(scale(res[[1]]))), method = "ward.D2")
+vec = hclu[["order"]]
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters_Top10_ONLYLP.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = colData_LP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
+Heatmap(t(scale(res[[1]][,vec])), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
 dev.off()
 ```
 ```{r}
