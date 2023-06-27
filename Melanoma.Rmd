@@ -1,7 +1,8 @@
 ---
-title: "MahaDeconvolution"
+title: "Melanoma"
+author: "Marcelo Hurtado"
+date: "2023-06-27"
 output: html_document
-date: '2023-06-17'
 ---
 
 ```{r}
@@ -10,7 +11,11 @@ libraries_set()
 ```
 
 ```{r}
-deconv <- as.matrix(read.csv(paste0(getwd(), "/Input/Deconvolution/Deconvolution_Maha.csv"), row.names = 1, sep=","))
+Deconvolution_Melanoma <- read.csv("~/LungPredict1/Input/Deconvolution/Deconvolution_Melanoma.csv", row.names=1)
+
+clinical.data = read.csv("~/LungPredict1/Input/ClinicalData/ClinicalLPVan.csv", row.names=1)
+clinical.data = clinical.data[-which(clinical.data$Batch==6),]
+deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
 ```
 
 ```{r}
@@ -409,24 +414,23 @@ for (i in 1:length(res)) {
 dt = data.frame(dt)
 rownames(dt) = rownames(deconv)
 
-saveRDS(res, "Groups_cells_all_MAHA.rds")
-saveRDS(groups, "Groups_cells_correlation_MAHA.rds")
-saveRDS(groups_similarity, "Groups_cells_similarity_MAHA.rds")
+saveRDS(res, "Groups_cells_all_EARLYSTAGE.rds")
+saveRDS(groups, "Groups_cells_correlation_EARLYSTAGE.rds")
+saveRDS(groups_similarity, "Groups_cells_similarity_EARLYSTAGE.rds")
 
-write.csv(dt, "Deconvolution_after_MAHA.csv")
+write.csv(dt, "Deconvolution_after_EARLY_STAGE.csv")
 ```
+
 Input data
 ```{r}
-Maha_TPM_normalization_bulk <- read.csv("~/LungPredict1/Input/Counts/Maha_TPM_normalization_bulk.txt", header=FALSE, row.names=1)
-colnames(Maha_TPM_normalization_bulk) = Maha_TPM_normalization_bulk[1,]
-Maha_TPM_normalization_bulk = Maha_TPM_normalization_bulk[-1,]
-TFs = compute_TFs_scores(Maha_TPM_normalization_bulk, "Maha")
+dataset = "LPVan"
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
 ```
 
 TFs filtering
 ```{r}
 #Remove columns with low variance (no much change across samples)
-TFs = TFs[-which(rowVars(TFs)<=summary(rowVars(TFs))[2]),]
+TFs = data.frame(TFs[-which(rowVars(TFs)<=summary(rowVars(TFs))[2]),])
 minAbsValue <- abs(min(TFs))
 TFs = TFs + minAbsValue
 ```
@@ -434,11 +438,11 @@ TFs = TFs + minAbsValue
 Finding modules of TFs
 ```{r}
 hc <- as.dendrogram(hclust(dist(t(scale(t(TFs)))), method = "ward.D2"))
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/TFs_clusters_MAHA.png"), width = 7500, height = 4500, res=250)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/TFs_clusters_EARLYSTAGE.png"), width = 7500, height = 4500, res=250)
 plot(hc)
-rect.dendrogram(hc, h = 10,horiz=F)
+rect.dendrogram(hc, h = 20,horiz=F)
 dev.off()
-clusters <- cutree(hc, h = 10)
+clusters <- cutree(hc, h = 20)
 ```
 
 TFs clustering merging
@@ -452,8 +456,8 @@ TFs_modules = TFs %>%
 
 hc <- as.dendrogram(hclust(dist(t(scale(t(TFs_modules)))), method = "ward.D2"))
 plot(hc)
-rect.dendrogram(hc, h = 5,horiz=F)
-clusters2 <- cutree(hc, h = 5)
+rect.dendrogram(hc, h = 10,horiz=F)
+clusters2 <- cutree(hc, h = 10)
 
 TFs_modules_merge = TFs_modules %>%
   as_tibble() %>%
@@ -462,16 +466,13 @@ TFs_modules_merge = TFs_modules %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
-write.csv(TFs_modules_merge, "TFs_modules_MAHA.csv")
+write.csv(TFs_modules_merge, "TFs_modules_EARLY_STAGE.csv")
 ```
 
 Correlating deconvolution with TFs activity
 ```{r}
-idx = c("Cluster 10", "Cluster 11", "Cluster 8", "Cluster 9", "Cluster 5")
-TFs_modules_merge = TFs_modules_merge[-which(rownames(TFs_modules_merge)%in%idx),]
-
 nSamples = ncol(TFs_modules_merge)
-TFs_modules_merge = TFs_modules_merge[,colnames(TFs_modules_merge)%in%rownames(dt)]
+TFs_modules_merge = TFs_modules_merge[,colnames(TFs_modules_merge)%in%rownames(clinical.data)]
 moduleTraitCor = cor(t(TFs_modules_merge), dt, use = "p")
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
 
@@ -489,7 +490,7 @@ hc1 <- hclust(d, method = "ward.D2" )
 vec = hc1[["order"]]
   
 # ###Figure module-trait relationship
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/Module_trait_relationships_Maha.png"), width = 4000, height = 1500, res=150)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Module_trait_relationships_EARLYSTAGE.png"), width = 4000, height = 1500, res=150)
 par(mar = c(20, 20, 4, 4)) #bottom, left, top, right
 labeledHeatmap(Matrix = moduleTraitCor[,vec],
                xLabels = names(dt[,vec]),
@@ -503,22 +504,20 @@ labeledHeatmap(Matrix = moduleTraitCor[,vec],
                zlim = c(-1,1),
                main = paste("Module-trait relationships"))
 dev.off()
-
-
 ```
 
 Figure dendogram cell types based on TFs activity 
 ```{r}
 hc = as.dendrogram(hc1)
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/Dendogram_Subgroups_cells_Maha.png"), width = 2500, height = 2500, res=150)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Dendogram_Subgroups_cells_EARLYSTAGE.png"), width = 2500, height = 2500, res=150)
 par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
 plot(hc, horiz= T)
-rect.dendrogram(hc, h=0.6,horiz=TRUE)
+rect.dendrogram(hc, h=0.8,horiz=TRUE)
 dev.off()
 
-clusters3 <- cutree(hc, h = 0.6)
+clusters3 <- cutree(hc, h = 0.8)
 
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/Deconvolution_Maha.png"), width = 6000, height = 4500, res=250)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_EARLYSTAGE.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(dt)), cluster_rows = hc, clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
@@ -533,9 +532,9 @@ deconv_df = dt %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
-write.csv(t(deconv_df), "Deconvolution_after_MAHA_clusters.csv")
+write.csv(t(deconv_df), "Deconvolution_after_EARLYSTAGE_clusters.csv")
 
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/Deconvolution_Maha_NICHES.png"), width = 6000, height = 4500, res=250)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_EARLYSTAGE_NICHES.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(t(deconv_df))), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 
@@ -551,20 +550,24 @@ for (i in 1:nrow(deconv_df)) {
   niches[[i]] = rownames(data)[which(data$Cluster==i)]
 }
 
-saveRDS(niches, "Cell_groups_Maha.rds")
+saveRDS(niches, "Cell_groups_EARLYSTAGE.rds")
 ```
-Clustering patients 
+
+Clustering patients early stage LP and Vanderbilt
 ```{r}
-ClinicalData_Maha <- read.csv("~/LungPredict1/Input/ClinicalData/ClinicalData_Maha.csv", row.names=1)
+dataset = "LungPredict"
+colData_LP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
 data = t(deconv_df)
-hc1 = as.dendrogram(hclust(dist(scale(data)), method = "ward.D2"))
-png(paste0(getwd(),"/Figures/Heatmaps/New2/Patients_clusters_Maha.png"), width = 2500, height = 1500, res=150)
+LP = data[rownames(data)%in%rownames(colData_LP),]
+colData_LP = colData_LP[rownames(colData_LP)%in%rownames(LP),]
+hc1 = as.dendrogram(hclust(dist(scale(LP)), method = "ward.D2"))
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Patients_clusters_EARLYSTAGE.png"), width = 2500, height = 1500, res=150)
 plot(hc1)
 rect.dendrogram(hc1, k=2,horiz=F)
 dev.off()
 clusters <- cutree(hc1, k=2)
-ClinicalData_Maha$cluster = NULL
-ClinicalData_Maha$cluster = clusters
+colData_LP$cluster = NULL
+colData_LP$cluster = clusters
 
 random_forest <- function(data, target, k_features) {
   # Step 1: Random Forest Feature Selection
@@ -579,43 +582,9 @@ random_forest <- function(data, target, k_features) {
   return(list(rf_selected_features, rf_importance))
 }
 
-res = random_forest(t(deconv_df), ClinicalData_Maha$cluster, 10)
+res = random_forest(data.frame(LP), colData_LP$cluster, 10)
 
-ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  labs(x = "Features", y = "Importance") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-hclu = hclust(dist(t(scale(res[[1]]))), method = "ward.D2")
-vec = hclu[["order"]]
-
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/Deconvolution_Maha_FS_CLUSTERS_1_2.png"), width = 6000, height = 4500, res=250)
-ha <- HeatmapAnnotation(Cluster = ClinicalData_Maha$cluster, Response = ClinicalData_Maha$Response, col = list(Cluster = c("1" = "yellow", "2" = "purple"), Response = c("Responders"="green", "Non responders" = "red")))
-Heatmap(t(scale(res[[1]][,vec])), cluster_rows = F, column_dend_reorder = T,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
-dev.off()
-```
-
-Response
-```{r}
-ClinicalData_Maha <- read.csv("~/LungPredict1/Input/ClinicalData/ClinicalData_Maha.csv", row.names=1)
-
-random_forest <- function(data, target, k_features) {
-  # Step 1: Random Forest Feature Selection
-  target = as.factor(target)
-  # Step 2: Random Forest Classification
-  rf_classifier <- randomForest(target ~ ., data = data)
-  rf_importance <- importance(rf_classifier)
-  rf_importance <- rf_importance[order(rf_importance, decreasing = TRUE), ]
-  rf_selected_features <- data[, names(rf_importance[order(rf_importance, decreasing = TRUE)][1:k_features])]
-  rf_importance = data.frame(rf_importance)
-  colnames(rf_importance)[1] = "Importance"
-  return(list(rf_selected_features, rf_importance))
-}
-
-res = random_forest(t(deconv_df), ClinicalData_Maha$Response, 10)
-
-
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/Clusters_Feature_Importance_Maha.png"), width = 2000, height = 1500, res=250)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Clusters_Feature_Importance_EARLYSTAGE.png"), width = 2000, height = 1500, res=250)
 ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   labs(x = "Features", y = "Importance") +
@@ -625,14 +594,24 @@ dev.off()
 hclu = hclust(dist(t(scale(res[[1]]))), method = "ward.D2")
 vec = hclu[["order"]]
 
-png(paste0(getwd(),"/Figures/Heatmaps/Maha/Deconvolution_Maha_FS_CLUSTERS.png"), width = 6000, height = 4500, res=250)
-ha <- HeatmapAnnotation(Response = ClinicalData_Maha$Response, col = list(Response = c("Responders" = "green", "Non responders" = "red")))
-Heatmap(t(scale(t(deconv_df))), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_EARLYSTAGE_FS_CLUSTERS.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = colData_LP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
+Heatmap(t(scale(res[[1]][,vec])), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
 dev.off()
 ```
 
+Vanderbilt validation
 ```{r}
-RESPONSE <- read.csv("~/LungPredict1/Figures/Heatmaps/Maha/Anova_response_Maha.csv", row.names=1)
-compute_violin(RESPONSE, ClinicalData_Maha$Response, "Maha")
-```
+dataset = "Vanderbilt"
+data = t(deconv_df)
+colData_Van <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+Van = data[rownames(data)%in%rownames(colData_Van),]
+Van = Van[,colnames(Van)%in%colnames(res[[1]])]
+colData_Van = colData_Van[rownames(colData_Van)%in%rownames(Van),]
 
+names = colnames(res[[1]][,vec])
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_EARLYSTAGE_VANDERBILT.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(Van[, names])), cluster_rows = F,  clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```

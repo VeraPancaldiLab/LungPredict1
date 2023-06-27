@@ -423,11 +423,11 @@ for (i in 1:length(res)) {
 dt = data.frame(dt)
 rownames(dt) = rownames(deconv)
 
-write.csv(dt, "Deconvolution_after_LATE_STAGE.csv")
+write.csv(dt, paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_after_LATE_STAGE.csv"))
 
-saveRDS(res, "Groups_cells_all_LATESTAGE.rds")
-saveRDS(groups, "Groups_cells_correlation_LATESTAGE.rds")
-saveRDS(groups_similarity, "Groups_cells_similarity_LATESTAGE.rds")
+saveRDS(res, paste0(getwd(),"/Figures/Heatmaps/New3/Groups_cells_all_LATESTAGE.rds"))
+saveRDS(groups, paste0(getwd(),"/Figures/Heatmaps/New3/Groups_cells_correlation_LATESTAGE.rds"))
+saveRDS(groups_similarity, paste0(getwd(),"/Figures/Heatmaps/New3/Groups_cells_similarity_LATESTAGE.rds"))
 ```
 
 Input data TFs
@@ -474,7 +474,7 @@ TFs_modules_merge = TFs_modules %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
-write.csv(TFs_modules_merge, "TFs_modules_LATE_STAGE.csv")
+write.csv(TFs_modules_merge,  paste0(getwd(),"/Figures/Heatmaps/New3/TFs_modules_LATE_STAGE.csv"))
 ```
 
 Correlating deconvolution with TFs activity
@@ -539,7 +539,7 @@ deconv_df = dt %>%
   summarise(across(everything(), mean)) %>%
   column_to_rownames("Cluster")
 
-write.csv(t(deconv_df), "Deconvolution_after_LATESTAGE_clusters.csv")
+write.csv(t(deconv_df),  paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_after_LATESTAGE_clusters.csv"))
 
 png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE_NICHES.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(t(deconv_df))), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
@@ -557,7 +557,7 @@ for (i in 1:nrow(deconv_df)) {
   niches[[i]] = rownames(data)[which(data$Cluster==i)]
 }
 
-saveRDS(niches, "Cell_groups_LATESTAGE.rds")
+saveRDS(niches,  paste0(getwd(),"/Figures/Heatmaps/New3/Cell_groups_LATESTAGE.rds"))
 ```
 Random Forest
 ```{r}
@@ -609,17 +609,16 @@ clinical.data = clinical.data[rownames(clinical.data)%in%rownames(response),]
 clinical.data$response = response$response
 
 clinical.data = clinical.data[-which(clinical.data$response=="No data"),]
-data = data[rownames(data)%in%rownames(clinical.data),]
-
-write.csv(clinical.data, "colData_response.csv")
-write.csv(data, "Data_response.csv")
+# data = data[rownames(data)%in%rownames(clinical.data),]
+# write.csv(clinical.data, "colData_response.csv")
+# write.csv(data, "Data_response.csv")
 
 dat = res[[1]]
 dat = dat[rownames(dat)%in%rownames(clinical.data),]
 
 ha <- HeatmapAnnotation(Cluster = clinical.data$cluster, Response = clinical.data$response, col = list(Cluster = c("1" = "green", "2" = "purple"), Response = c("Responders" = "green", "Non responders"= "red")))
 png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE_FS_CLUSTERS_RESPONSE.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(dat)), clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+Heatmap(t(scale(dat)),  clustering_method_columns = "ward.D", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 
 ```

@@ -240,7 +240,7 @@ compute_pathways_scores <- function(RNA.counts.normalized, file_name){
 ## TF analysis
 
 compute_TFs_scores = function(RNA.counts.normalized,  file_name){
-  
+
   dorothea2viper_regulons <- function(df) {
     regulon_list <- split(df, df$tf)
     viper_regulons <- lapply(regulon_list, function(regulon) {
@@ -436,7 +436,7 @@ compute_violin = function(data, feature, file_name){
             axis.title.y = element_text(size = 8, angle = 90))
     
     
-    ggsave(violin, file=paste0(getwd(),"/Figures/Violin_plots/", colnames(matrix[i]), "_", file_name, ".png"))
+    ggsave(violin, file=paste0(getwd(),"/Figures/Heatmaps/Maha/", colnames(matrix[i]), "_", file_name, ".png"))
   }
 }
 

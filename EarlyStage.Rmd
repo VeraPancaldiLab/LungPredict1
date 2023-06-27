@@ -611,7 +611,7 @@ colData_Van = colData_Van[rownames(colData_Van)%in%rownames(Van),]
 names = colnames(res[[1]][,vec])
 
 png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_EARLYSTAGE_VANDERBILT.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(Van[, names])), cluster_rows = F, clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+Heatmap(t(scale(Van[, names])), cluster_rows = F,  clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
 dev.off()
 ```
 
