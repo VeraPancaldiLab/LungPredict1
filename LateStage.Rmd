@@ -586,7 +586,7 @@ random_forest <- function(data, target, k_features) {
 }
 
 data = t(deconv_df)
-res = random_forest(data.frame(data), clinical.data$cluster, 10)
+res = random_forest(data.frame(data), clinical.data$cluster, 9)
 
 png(paste0(getwd(),"/Figures/Heatmaps/New3/Clusters_Feature_Importance_LATESTAGE.png"), width = 2000, height = 1500, res=250)
 ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
@@ -620,7 +620,8 @@ dat = dat[rownames(dat)%in%rownames(clinical.data),]
 hclu = hclust(dist(t(scale(dat))), method = "ward.D2")
 plot(as.dendrogram(hclu))
 vec = hclu[["order"]]
-
+vec2 = colnames(dat[,vec])
+  
 ha <- HeatmapAnnotation(Cluster = clinical.data$cluster, Response = clinical.data$response, col = list(Cluster = c("1" = "black", "2" = "purple"), Response = c("Responders" = "green", "Non responders"= "red")))
 png(paste0(getwd(),"/Figures/Heatmaps/New3/Deconvolution_LATESTAGE_FS_CLUSTERS_RESPONSE.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(dat[,vec])),  column_split = clinical.data$cluster,  cluster_rows = F, clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
