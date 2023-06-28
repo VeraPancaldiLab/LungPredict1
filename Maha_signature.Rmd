@@ -82,13 +82,13 @@ deconv_df = deconv_df[rownames(deconv_df)%in%rownames(clinical.data),]
 ```
 
 ```{r}
-idx = c("Cluster_4", "Cluster_17", "Cluster_16", "Cluster_20", "Cluster_15", "Cluster_9", "Cluster_14", "Cluster_12", "Cluster_13", "Cluster_5")
+idx = c("Cluster_4", "Cluster_17", "Cluster_16", "Cluster_20", "Cluster_15", "Cluster_9", "Cluster_14", "Cluster_12", "Cluster_13", "Cluster_18")
 deconv_df2 = deconv_df[,which(colnames(deconv_df)%in%idx)]
 deconv_df2 = deconv_df2[,vec2]
 
 #ha <- HeatmapAnnotation(Response = clinical.data$Response, col = list(Response = c("Responders" = "green", "Non responders"= "red")))
-png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters.png"), width = 6000, height = 4500, res=250)
-Heatmap(t(scale(deconv_df2)), cluster_rows=F,clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters.png"), width = 6000, height = 3500, res=250)
+Heatmap(t(scale(deconv_df2)), cluster_rows=F,clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(25, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
 
