@@ -511,10 +511,10 @@ hc = as.dendrogram(hc1)
 png(paste0(getwd(),"/Figures/Heatmaps/New2/Dendogram_Subgroups_cells_EARLYSTAGE.png"), width = 2500, height = 2500, res=150)
 par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
 plot(hc, horiz= T)
-rect.dendrogram(hc, h=0.8,horiz=TRUE)
+rect.dendrogram(hc, h=0.6,horiz=TRUE)
 dev.off()
 
-clusters3 <- cutree(hc, h = 0.8)
+clusters3 <- cutree(hc, k = 27)
 
 png(paste0(getwd(),"/Figures/Heatmaps/New2/Deconvolution_EARLYSTAGE.png"), width = 6000, height = 4500, res=250)
 Heatmap(t(scale(dt)), cluster_rows = hc, clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)

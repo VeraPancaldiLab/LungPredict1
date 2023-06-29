@@ -91,4 +91,115 @@ png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters.png"), w
 Heatmap(t(scale(deconv_df2)), cluster_rows=F,clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(25, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
 dev.off()
 ```
+```{r}
+hc1 = as.dendrogram(hclust(dist(scale(deconv_df)), method = "ward.D2"))
+plot(hc1)
+clusters <- cutree(hc1, k=2)
+clinical.data$cluster = NULL
+clinical.data$cluster = clusters
+```
+
+```{r}
+dataset = "LungPredict"
+colData_LP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+data = t(deconv_df)
+LP = data[,colnames(data)%in%rownames(colData_LP)]
+colData_LP = colData_LP[rownames(colData_LP)%in%colnames(LP),]
+hc1 = as.dendrogram(hclust(dist(scale(t(LP))), method = "ward.D2"))
+plot(hc1)
+rect.dendrogram(hc1, k=2,horiz=F)
+clusters <- cutree(hc1, k=2)
+colData_LP$cluster = NULL
+colData_LP$cluster = clusters
+```
+
+```{r}
+random_forest <- function(data, target, k_features) {
+  # Step 1: Random Forest Feature Selection
+  target = as.factor(target)
+  # Step 2: Random Forest Classification
+  rf_classifier <- randomForest(target ~ ., data = data)
+  rf_importance <- importance(rf_classifier)
+  rf_importance <- rf_importance[order(rf_importance, decreasing = TRUE), ]
+  rf_selected_features <- data[, names(rf_importance[order(rf_importance, decreasing = TRUE)][1:k_features])]
+  rf_importance = data.frame(rf_importance)
+  colnames(rf_importance)[1] = "Importance"
+  return(list(rf_selected_features, rf_importance))
+}
+
+res = random_forest(deconv_df, clinical.data$cluster, 10)
+res = random_forest(data.frame(t(LP)), colData_LP$cluster, 10)
+
+ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(x = "Features", y = "Importance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_RF_Top10.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = clinical.data$cluster, col = list(Cluster = c("1" = "green", "2" = "red")))
+Heatmap(t(scale(res[[1]])), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_RF_Top10_LP.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = colData_LP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
+Heatmap(t(scale(t(LP))), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
+```{r}
+compute_violin = function(data, feature, file_name){
+  
+  matrix = data.frame(data)
+  matrix$measure = factor(feature)
+  
+  for (i in (1:(ncol(matrix)))) {
+    violin = ggplot(matrix, aes(x=factor(measure), y=matrix[,i], fill=measure)) +
+      geom_violin(width=0.6) +
+      geom_boxplot(width=0.07, color="black", alpha=0.2) +
+      scale_fill_brewer() +
+      geom_smooth(aes(x=as.factor(measure), y=matrix[,i]), method = "loess") +
+      ylab(colnames(matrix[i])) +
+      xlab(file_name) +
+      labs(title=colnames(matrix[i])) +
+      theme(axis.text.x = element_text(angle = 0),
+            axis.title.y = element_text(size = 8, angle = 90))
+    
+    
+    ggsave(violin, file=paste0(getwd(),"/Figures/Heatmaps/New3/", colnames(matrix[i]), "_", file_name, ".png"))
+  }
+}
+
+compute_violin(res[[1]], clinical.data$Response, "Maha")
+compute_violin(t(LP), colData_LP$cluster, "LP")
+```
+
+```{r}
+wilcox <- function(features, clinical.data){
+  #rows = samples 
+  features = as.data.frame(features)
+  features$cluster <- clinical.data$cluster
+  Cluster1 = features[grep("1", features$cluster), ]
+  Cluster2 = features[grep("2", features$cluster), ]
+  
+  Cluster1vs2 = list()
+  for (i in (1:(ncol(features)-1))) {
+    IvsII = (wilcox.test(Cluster1[,i], Cluster2[,i]))
+    Cluster1vs2[[length(Cluster1vs2)+1]] = IvsII$p.value
+    keepWilcox <- which(Cluster1vs2 <0.01)
+  }
+  wilcoxPass1 = Cluster1[keepWilcox]
+  wilcoxPass2 = Cluster2[keepWilcox]
+  wilcoxPass = rbind(wilcoxPass1, wilcoxPass2)
+  matrix = cbind(features$cluster, wilcoxPass)
+  colnames(matrix)[1] = "Cluster"
+
+  return(matrix)
+  
+}
+
+mat = wilcox(deconv_df, clinical.data)
+
+png(paste0(getwd(),"/Figures/Heatmaps/New2/EarlyStage_LateStageClusters_Anova.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(mat[,-1])), cluster_rows = F,  clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
 
