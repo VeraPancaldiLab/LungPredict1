@@ -1,0 +1,105 @@
+---
+title: "PCA"
+author: "Marcelo Hurtado"
+date: "2023-01-30"
+output: html_document
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Input files
+```{r}
+dataset = "LungPredict"
+dataset = "Vanderbilt"
+dataset = "VanIP"
+
+#Input files
+Counts_normalized <- read.csv(paste0(getwd(),"/Output/Counts_normalized_", dataset, ".csv"), row.names = 1)
+clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+```
+
+PCA global analysis of variables
+```{r}
+compute_pca_analysis(Counts_normalized, clinical.data, 6, dataset)
+```
+
+LungPredict
+```{r}
+p <- pca(Counts_normalized, metadata = clinical.data, removeVar = 0.1)
+
+pbiplot_loadings <- biplot(p, x = "PC1", y = "PC2",
+                             showLoadings = TRUE,
+                             lengthLoadingsArrowsFactor = 1.5,
+                             sizeLoadingsNames = 4,
+                             colLoadingsNames = 'red4',
+                             lab = NULL,
+                             colby = "Metastatic",
+                             hline = 0, vline = c(-25, 0, 25),
+                             vlineType = c('dotdash', 'solid', 'dashed'),
+                             gridlines.major = FALSE, gridlines.minor = FALSE,
+                             pointSize = 5,
+                             legendPosition = 'left', legendLabSize = 14, legendIconSize = 8.0,
+                             drawConnectors = FALSE,
+                             title = 'PCA loadings',
+                             subtitle = "PC1 versus PC2")
+
+png(paste0(getwd(),"/Figures/PCA/pbiplot_Metastasis_", dataset, ".png"), width = 2000, height = 1500, res = 150)
+print(pbiplot_loadings)
+dev.off()
+```
+
+Vanderbilt
+```{r}
+p <- pca(Counts_normalized, metadata = clinical.data, removeVar = 0.1)
+
+pbiplot_loadings <- biplot(p, x = "PC1", y = "PC2",
+                             showLoadings = TRUE,
+                             lengthLoadingsArrowsFactor = 1.5,
+                             sizeLoadingsNames = 4,
+                             colLoadingsNames = 'red4',
+                             lab = NULL,
+                             colby = "Gender",
+                             hline = 0, vline = c(-25, 0, 25),
+                             vlineType = c('dotdash', 'solid', 'dashed'),
+                             gridlines.major = FALSE, gridlines.minor = FALSE,
+                             pointSize = 5,
+                             legendPosition = 'left', legendLabSize = 14, legendIconSize = 8.0,
+                             drawConnectors = FALSE,
+                             title = 'PCA loadings',
+                             subtitle = "PC1 versus PC2")
+
+png(paste0(getwd(),"/Figures/PCA/pbiplot_Gender_", dataset, ".png"), width = 2000, height = 1500, res = 150)
+print(pbiplot_loadings)
+dev.off()
+```
+
+Vanderbilt IP
+```{r}
+p <- pca(Counts_normalized, metadata = clinical.data, removeVar = 0.1)
+
+pbiplot_loadings <- biplot(p, x = "PC1", y = "PC2",
+                             showLoadings = TRUE,
+                             lengthLoadingsArrowsFactor = 1.5,
+                             sizeLoadingsNames = 4,
+                             colLoadingsNames = 'red4',
+                             lab = NULL,
+                             colby = "Gender",
+                             hline = 0, vline = c(-25, 0, 25),
+                             vlineType = c('dotdash', 'solid', 'dashed'),
+                             gridlines.major = FALSE, gridlines.minor = FALSE,
+                             pointSize = 5,
+                             legendPosition = 'left', legendLabSize = 14, legendIconSize = 8.0,
+                             drawConnectors = FALSE,
+                             title = 'PCA loadings',
+                             subtitle = "PC1 versus PC2")
+
+png(paste0(getwd(),"/Figures/PCA/pbiplot_Gender_", dataset, ".png"), width = 2000, height = 1500, res = 150)
+print(pbiplot_loadings)
+dev.off()
+```
+
+
