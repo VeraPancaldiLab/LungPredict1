@@ -20,8 +20,16 @@ library(patchwork)
 
 Setup the Seurat Object
 ```{r}
-Convert("NK_cells.h5ad", dest = "h5seurat", overwrite = T)
-seurat_anndata = LoadH5Seurat("NK_cells.h5seurat",  assays = "RNA")
+Convert("all_samples.h5ad", dest = "h5seurat", overwrite = T)
+seurat_anndata = LoadH5Seurat("all_samples.h5seurat",  assays = "RNA")
+```
+
+```{r}
+DimPlot(seurat_anndata, reduction = "umap",  label = T)
+cluster.ids = c("B cells","CD4+ T cells" , "CD8+ T cells","Endothelial cells","Epithelial/Cancer","Fibroblasts","Mast cells","Mural cells","Myeloid cells","NK cells",            "Plasma B cells","T cells proliferative","T helper cells","T reg. cells")
+names(cluster.ids)= levels(seurat_anndata)
+seurat_anndata = RenameIdents(pbmc, cluster.ids)
+DimPlot(seurat_anndata, reduction = "umap",  label = T)
 ```
 
 ```{r}
@@ -33,7 +41,8 @@ ColumnData_Vanderbilt = ColumnData_Vanderbilt[which(ColumnData_Vanderbilt$pt_ID 
 ```{r}
 # Dimensionality reduction
 pbmc <- NormalizeData(seurat_anndata, normalization.method = "LogNormalize", scale.factor = 10000)
-cll.combined <- RunPCA(pbmc, features = VariableFeatures(object = pbmc), verbose = FALSE)
+cll.combined = seurat_anndata
+cll.combined <- RunPCA(cll.combined, features = VariableFeatures(object = cll.combined), verbose = FALSE)
 print(cll.combined[["pca"]], dims = 1:5, nfeatures = 5)
 DimHeatmap(cll.combined, dims = 1, cells = 500, balanced = T)
 DimHeatmap(cll.combined, dims = 2, cells = 500, balanced = T)
@@ -60,7 +69,7 @@ Idents(cll.combined) # 6 clusters
 # Non-linear dimensionality reduction
 cll.combined <- RunUMAP(cll.combined, dims = 1:10) #increase the dimension if necessary
 # Grouped UMAP
-DimPlot(cll.combined, reduction = "umap")
+DimPlot(cll.combined, reduction = "umap",  label = T)
 # Splited by day UMAP
 DimPlot(cll.combined, reduction = "umap", split.by = "orig.ident", label = TRUE)
 

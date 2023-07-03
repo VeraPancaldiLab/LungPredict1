@@ -19,30 +19,30 @@ deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
 
 ```{r}
 idx = c("Epidish_CCLE_TIL10_NK.cells","CBSX__CCLE.TIL10__NK.cells", "Epidish_TIL10_NK.cells", "CBSX__TIL10__NK.cells")
-idy = c("DeconRNASeq_Fig2ab.NSCLC_PBMCs_scRNAseq_sigmatrix_NK.cells","DeconRNASeq_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_NK.cells", "DeconRNASeq_TIL10_NK.cells",
-"Epidish_LM22_NK.cells.resting","CBSX__LM22__NK_cells_resting")
+idy = c("DeconRNASeq_Fig2ab.NSCLC_PBMCs_scRNAseq_sigmatrix_NK.cells","DeconRNASeq_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_NK.cells")
 
 NK_sub1 = deconv[,which(colnames(deconv)%in%idx)]
 NK_sub2 = deconv[,which(colnames(deconv)%in%idy)]
 pt_ID = c()
-pt_ID2 = c()
-for (i in 1:ncol(NK_sub2)) {
-  patients = rownames(NK_sub2)[which(NK_sub2[,i]>summary(NK_sub2[,i])[5])]
-  pt_ID2 = c(pt_ID2, patients)
+data = NK_sub2
+for (i in 1:ncol(data)) {
+  patients = rownames(data)[which(data[,i]>summary(data[,i])[5])]
+  pt_ID = c(pt_ID, patients)
 }
-pt_ID2 = unique(pt_ID2)
+pt_ID1 = unique(pt_ID)
+pt_ID2 = unique(pt_ID)
 
 x = c()
-for (i in 1:length(pt_ID)) {
-  if((pt_ID[i]%in%pt_ID2)==T){
-    x = c(x, pt_ID[i])
+for (i in 1:length(pt_ID1)) {
+  if((pt_ID1[i]%in%pt_ID2)==T){
+    x = c(x, pt_ID1[i])
   }
 }
-pt_ID = pt_ID[-which(pt_ID%in%x)]
+pt_ID1 = pt_ID1[-which(pt_ID1%in%x)]
 pt_ID2 = pt_ID2[-which(pt_ID2%in%x)]
 
 clinical.data$NK = "na"
-clinical.data$NK[rownames(clinical.data)%in%pt_ID] = "NK_cluster_1"
+clinical.data$NK[rownames(clinical.data)%in%pt_ID1] = "NK_cluster_1"
 clinical.data$NK[rownames(clinical.data)%in%pt_ID2] = "NK_cluster_2"
 table(clinical.data$NK)
 ```
@@ -51,7 +51,7 @@ table(clinical.data$NK)
 Counts <- read.csv("~/LungPredict1/Output/Counts_normalized_LPVan.csv", row.names=1)
 Counts = Counts[,colnames(Counts)%in%rownames(clinical.data)]
 
-compute_msVIPER_scores = function(RNA.counts.normalized, test_name, ref_name, measure){
+compute_msVIPER_scores = function(RNA.counts.normalized, test_name, ref_name, measure, file_name){
   
   dorothea2viper_regulons <- function(df) {
     regulon_list <- split(df, df$tf)
@@ -102,13 +102,13 @@ compute_msVIPER_scores = function(RNA.counts.normalized, test_name, ref_name, me
   # write.csv(TFs_msviper,paste0(getwd(),"/Output/TFs/msVIPER/TFs_scores_DifferentialActive_", file_name, ".csv"))
   
   # Plot DiffActive TFs
-  png(paste0(getwd(),"/Figures/Heatmaps/msVIPER/NKs.png"), width = 1000, height = 800, res=100)
+  png(paste0(getwd(),"/Figures/Heatmaps/msVIPER/NKs_",file_name, ".png"), width = 1000, height = 800, res=100)
   print(plot(mra, mrs=15, cex=1, include = c("expression","activity")))
   dev.off()
   
 }
 
-compute_msVIPER_scores(Counts, "NK_cluster_1", "NK_cluster_2", clinical.data$NK)
+compute_msVIPER_scores(Counts, "NK_cluster_1", "NK_cluster_2", clinical.data$NK, "EARLYSTAGE")
 ```
 
 
@@ -141,8 +141,8 @@ clinical.data$response = response$response
 clinical.data = clinical.data[-which(clinical.data$response=="No data"),]
 deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
 
-idx = c("Quantiseq_NK_cell","DeconRNASeq_BPRNACanProMet_NK")
-idy = c("DeconRNASeq_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_NK.cells", "CBSX__LM22__NK_cells_activated","DeconRNASeq_LM22_NK.cells.resting")
+idx = c("Quantiseq_NK_cell","DeconRNASeq_BPRNACanProMet_NK", "CBSX__LM22__NK_cells_resting")
+idy = c("DeconRNASeq_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_NK.cells", "CBSX__LM22__NK_cells_activated")
 
 NK_sub1 = deconv[,which(colnames(deconv)%in%idx)]
 NK_sub2 = deconv[,which(colnames(deconv)%in%idy)]
@@ -237,5 +237,5 @@ compute_msVIPER_scores = function(RNA.counts.normalized, test_name, ref_name, me
   
 }
 
-compute_msVIPER_scores(Counts, "NK_cluster_1", "NK_cluster_2", clinical.data$NK, "LateStage2")
+compute_msVIPER_scores(Counts, "NK_cluster_1", "NK_cluster_2", clinical.data$NK, "LateStage")
 ```
