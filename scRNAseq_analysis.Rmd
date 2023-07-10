@@ -1,0 +1,303 @@
+---
+title: "Single cell analysis"
+author: "Marcelo Hurtado"
+date: "2023-07-10"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(SeuratDisk)
+library(decoupleR)
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(patchwork)
+library(ggplot2)
+library(pheatmap)
+library(OmnipathR)
+library(SingleR)
+```
+
+```{r}
+#Convert("all_samples.h5ad", dest = "h5seurat", overwrite = T)
+seurat_anndata = LoadH5Seurat("all_samples.h5seurat",  assays = "RNA")
+
+levels(seurat_anndata@meta.data$sample)
+clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_Vanderbilt.csv", row.names = 1))
+clinical.data <- clinical.data[,c(1,5,6,9,11,13)]
+
+coldata = clinical.data[clinical.data$pt_ID%in%levels(seurat_anndata@meta.data$sample),]
+#14958 14965 11817 13634 15467 12929  8356 12889 15002
+#"R3388_YZ_1"  "R3388_YZ_2"  "R3388_YZ_10" "R3388_YZ_11" "R3388_YZ_18" "R3388_YZ_28" "R3388_YZ_56" "R4163_YZ_16" "R4163_YZ_25"
+```
+
+Clustering
+```{r}
+DimPlot(seurat_anndata, reduction="umap")
+ElbowPlot(seurat_anndata) #determine dimensionality of data
+seurat_anndata = FindNeighbors(seurat_anndata, dims = 1:20)
+seurat_anndata = FindClusters(seurat_anndata, resolution = 1)
+DimPlot(seurat_anndata, reduction="umap", label = T)
+```
+
+Manual annotation 
+
+Find markers (one cluster vs all others)
+```{r}
+markers = FindAllMarkers(seurat_anndata,
+               logfc.threshold = 0.25, #min logfc 
+               min.pct = 0.1, #genes that are detected on 50% frequency across clusters
+               only.pos = T,
+               test.use = 'wilcox',
+               slot = 'counts')
+head(markers)
+```
+
+```{r, fig.width = 14, fig.height = 11, fig.align = 'center'}
+features = c('NKG7', 'IL7R', 'HLA-DRA','IGHG1','BATF','IGFBP7', 'TYROBP', 'RAMP2','TYMS','TPSAB1','WFDC2','SFRP21')
+RidgePlot(seurat_anndata, features = features, ncol = 3)
+VlnPlot(seurat_anndata, features = features)
+FeaturePlot(seurat_anndata, features = features)
+```
+
+Automatic cell annotation (ATLAS)
+```{r}
+ref = celldex::HumanPrimaryCellAtlasData()
+single_counts = GetAssayData(seurat_anndata, slot='counts')
+pred = SingleR(test = single_counts, 
+        ref = ref,
+        labels = ref$label.main)
+#head(pred)
+seurat_anndata$singleR.labels = pred$labels[match(rownames(seurat_anndata@meta.data), rownames(pred))]
+DimPlot(seurat_anndata, reduction = 'umap', group.by = 'singleR.labels')
+head(pred$scores)
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+tab = table(Assigned = pred$labels, Clusters = seurat_anndata$seurat_clusters)
+pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
+```
+
+Find markers for NK cells (one cluster vs all others)
+```{r}
+markers_NK = FindMarkers(seurat_anndata, ident.1 = "NK_cell")
+head(markers_NK)
+features = rownames(markers_NK)[1:6]
+FeaturePlot(seurat_anndata, features = features)
+```
+
+Extract NK cluster (cluster = 8) for further analysis
+```{r}
+Idents(seurat_anndata) <- "singleR.labels" 
+NK = subset(seurat_anndata, idents = "NK_cell", invert = FALSE)
+DimPlot(NK, reduction="umap")
+```
+
+NK clustering
+```{r}
+ElbowPlot(NK) #determine dimensionality of data
+NK<- FindNeighbors(NK, dims = 1:10)
+NK<- FindClusters(NK, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
+NK<- RunUMAP(NK, dims = 1:10)
+DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) + 
+  NoLegend() + ggtitle('NK cells')
+```
+```{r}
+clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_Vanderbilt.csv", row.names = 1))
+clinical.data <- clinical.data[,c(1,5,6,9,11,13)]
+
+coldata = clinical.data[clinical.data$pt_ID%in%levels(nk@meta.data$sample),]
+
+#"R3388_YZ_1"  "R3388_YZ_2"  "R3388_YZ_10" "R3388_YZ_11" "R3388_YZ_18" "R3388_YZ_28" "R3388_YZ_56" "R4163_YZ_16" "R4163_YZ_25"
+# "R3388_YZ_1" ---> Cluster 2
+# "R3388_YZ_2"  ---> Cluster 1
+# "R3388_YZ_10" ---> Cluster 1
+# "R3388_YZ_28" ---> Cluster 1
+
+cluster1 = c("14965", "11817", "12929") #"R3388_YZ_2", "R3388_YZ_10", "R3388_YZ_28"
+cluster2 = c("14958") #R3388_YZ_1
+
+NK[['Clusters_bulk']] = FALSE
+NK@meta.data$Clusters_bulk[which(NK@meta.data$sample%in%cluster1)] = 'Bulk cluster 1'
+NK@meta.data$Clusters_bulk[which(NK@meta.data$sample%in%cluster2)] = 'Bulk cluster 2'
+cell_values <- c("Bulk cluster 1", "Bulk cluster 2")
+nk2 = subset(NK, subset = Clusters_bulk == cell_values)
+
+p2 = DimPlot(nk2, reduction="umap", group.by = 'Clusters_bulk') + 
+  ggtitle('Samples from bulk')
+p2
+```
+```{r}
+markers = FindAllMarkers(NK,
+               logfc.threshold = 0.25, #min logfc 
+               min.pct = 0.1, #genes that are detected on 50% frequency across clusters
+               only.pos = T,
+               test.use = 'wilcox',
+               slot = 'counts')
+head(markers)
+features = rownames(markers)[1:6]
+RidgePlot(NK, features = features, ncol = 3)
+VlnPlot(NK, features = features)
+FeaturePlot(NK, features = features)
+```
+
+Differential expressed markers across clusters 0 and 1
+```{r}
+markers = FindMarkers(NK, ident.1 = "0", ident.2 = "1")
+head(markers, n=20)
+features = rownames(markers)[1:6]
+#features = c('CCL3', 'TIGIT', 'CD69','IRF8','IL2RB','CD160') markers from Pierre-Paul
+FeaturePlot(NK, features = features)
+VlnPlot(NK, features = features)
+RidgePlot(NK, features = features, ncol = 2)
+```
+
+TFs inference from single cell data - NK cells
+```{r}
+dorothea2viper_regulons <- function(df) {
+  regulon_list <- split(df, df$tf)
+  viper_regulons <- lapply(regulon_list, function(regulon) {
+    tfmode <- stats::setNames(regulon$mor, regulon$target)
+    list(tfmode = tfmode, likelihood = rep(1, length(tfmode)))
+  })
+    
+  return(viper_regulons)
+}
+  
+data("dorothea_hs", package = "dorothea")
+regulons <- dorothea_hs %>%
+  filter(confidence %in% c("A", "B", "C"))
+```
+
+Getting only variable features
+```{r}
+NK <- FindVariableFeatures(NK, selection.method = "vst", nfeatures = 10000)
+var_feat = VariableFeatures(NK)
+nk_top <- GetAssayData(NK)[var_feat,]
+```
+
+```{r}
+# Extract the normalized log-transformed counts
+mat <- as.matrix(nk_top)
+
+# Run ulm
+acts <- run_ulm(mat=mat, net=regulons, .source='tf', .target='target',
+                .mor='mor', minsize = 5)
+acts
+```
+
+```{r}
+# Extract ulm and store it in tfsulm in pbmc
+NK[['tfsulm']] <- acts %>%
+  pivot_wider(id_cols = 'source', names_from = 'condition',
+              values_from = 'score') %>%
+  column_to_rownames('source') %>%
+  Seurat::CreateAssayObject(.)
+
+# Change assay
+DefaultAssay(object = NK) <- "tfsulm"
+
+# Scale the data
+NK <- ScaleData(NK)
+NK@assays$tfsulm@data <- NK@assays$tfsulm@scale.data
+```
+
+```{r}
+markers = FindAllMarkers(NK,
+               logfc.threshold = 0.25, #min logfc 
+               min.pct = 0.1, #genes that are detected on 50% frequency across clusters
+               only.pos = T,
+               test.use = 'wilcox',
+               slot = 'counts')
+head(markers)
+features = rownames(markers)[1:6]
+RidgePlot(NK, features = features, ncol = 3)
+VlnPlot(NK, features = features)
+(FeaturePlot(NK, features = features)& 
+  scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
+```
+
+```{r}
+NK<- FindNeighbors(NK, dims = 1:10)
+NK<- FindClusters(NK, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
+NK<- RunUMAP(NK, dims = 1:10)
+DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) + 
+  NoLegend() + ggtitle('NK cells')
+markers = FindMarkers(NK, ident.1 = "0", ident.2 = "1")
+head(markers, n=30)
+```
+Protein activity
+```{r}
+features = rownames(markers)[1:6]
+(FeaturePlot(NK, features = features)& 
+  scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
+VlnPlot(NK, features = features)
+RidgePlot(NK, features = features, ncol = 2)
+```
+
+Gene expression
+```{r}
+DefaultAssay(object = NK) <- "RNA"
+NK@assays$RNA@data <- NK@assays$RNA@scale.data
+(FeaturePlot(NK, features = features)& 
+  scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
+VlnPlot(NK, features = features)
+RidgePlot(NK, features = features, ncol = 2)
+```
+
+```{r}
+p1 <- DimPlot(NK, reduction = "umap", label = TRUE, pt.size = 0.5) + 
+  NoLegend() + ggtitle('Cell types')
+p2 <- (FeaturePlot(NK, features = c("STAT4")) & 
+  scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red')) +
+  ggtitle('STAT4 activity')
+DefaultAssay(object = NK) <- "RNA"
+NK@assays$RNA@data <- NK@assays$RNA@scale.data
+p3 <- (FeaturePlot(NK, features = c("STAT4")) & 
+  scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red')) + ggtitle('STAT4 expression')
+DefaultAssay(object = NK) <- "tfsulm"
+p1 | p2 | p3
+```
+
+Exploration
+```{r}
+n_tfs <- 30
+# Extract activities from object as a long dataframe
+df <- t(as.matrix(NK@assays$tfsulm@data)) %>%
+  as.data.frame() %>%
+  mutate(cluster = Idents(NK)) %>%
+  pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
+  group_by(cluster, source) %>%
+  summarise(mean = mean(score))
+
+# Get top tfs with more variable means across clusters
+tfs <- df %>%
+  group_by(source) %>%
+  summarise(std = sd(mean)) %>%
+  arrange(-abs(std)) %>%
+  head(n_tfs) %>%
+  pull(source)
+
+# Subset long data frame to top tfs and transform to wide matrix
+top_acts_mat <- df %>%
+  filter(source %in% tfs) %>%
+  pivot_wider(id_cols = 'cluster', names_from = 'source',
+              values_from = 'mean') %>%
+  column_to_rownames('cluster') %>%
+  as.matrix()
+
+# Plot
+pheatmap(top_acts_mat, border_color = NA) 
+```
+
+```{r}
+p1 = DimPlot(nk, reduction = "umap")
+p2 = DimPlot(nk, reduction = "umap", group.by = 'sample')
+p1 | p2 
+```
+
+```{r}
+(FeaturePlot(NK, features = c("TBX21","PAX5", "LYL1", "HIF1A", "CXXC4")) & 
+  scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
+```
+
