@@ -26,7 +26,7 @@ If you are interested in contributing to this project, please contact the projec
 
 ## Authors
 - Marcelo Hurtado (https://github.com/Marcelo1308)
-- Leila Khajavi (leila.khajavi@inserm.fr)
+- Leila Khajavi (https://github.com/LeilaKhajavi)
 - Mouneem Essabar (https://github.com/mouneem)
 - Vera Pancaldi (https://github.com/VeraPancaldi)
 
