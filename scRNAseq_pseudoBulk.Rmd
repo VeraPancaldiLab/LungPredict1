@@ -1,0 +1,102 @@
+---
+title: "singleCell_pseudoBulk"
+author: "Marcelo Hurtado"
+date: "2023-07-11"
+output: html_document
+---
+
+```{r}
+library(ExperimentHub)
+library(Seurat)
+library(DESeq2)
+library(tidyverse)
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Load data 
+```{r}
+NK = readRDS("nk.rds")
+```
+
+Pseudo-bulk workflow
+```{r}
+# 1. counts matrix - sample level
+View(NK@meta.data) # Acquiring necessary metrics for aggregation across cells in a sample
+DefaultAssay(NK)
+
+# counts aggregate to sample level
+cts <- AggregateExpression(NK, 
+                    group.by = c("singleR.labels", "sample"),
+                    assays = 'tfsulm',
+                    slot = "counts",
+                    return.seurat = FALSE)
+cts <- cts$tfsulm
+
+cts.t <- t(cts) # transpose
+cts.t <- as.data.frame(cts.t)
+```
+
+```{r}
+cts.top = cts.t[,order(colVars(as.matrix(cts.t)), decreasing=T)[1:50]]
+png(paste0(getwd(),"/SingleCell_aggregation_NK.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(cts.top)), cluster_rows = F,  clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
+```{r}
+hc <- as.dendrogram(hclust(dist(scale(cts.top2)), method = "ward.D2"))
+png(paste0(getwd(),"/Figures/Heatmaps/New2/TFs_clusters_EARLYSTAGE.png"), width = 7500, height = 4500, res=250)
+plot(hc)
+rect.dendrogram(hc, k = 2,horiz=F)
+dev.off()
+clusters <- cutree(hc,  k = 2)
+colData$cluster = clusters
+```
+
+Run msViper between conditions
+```{r}
+
+dorothea2viper_regulons <- function(df) {
+    regulon_list <- split(df, df$tf)
+    viper_regulons <- lapply(regulon_list, function(regulon) {
+      tfmode <- stats::setNames(regulon$mor, regulon$target)
+      list(tfmode = tfmode, likelihood = rep(1, length(tfmode)))
+    })
+    
+    return(viper_regulons)
+  }
+  
+  data("dorothea_hs", package = "dorothea")
+  regulons <- dorothea_hs %>%
+    filter(confidence %in% c("A", "B", "C"))
+  regu <- dorothea2viper_regulons(regulons)
+  cts = as.data.frame(cts)
+
+  # Generating test and ref data
+  test_i <- which(colData$cluster == "2")
+  ref_i <- which(colData$cluster == "1")
+  
+  mat_test <- as.matrix(cts[,test_i])
+  mat_ref <- as.matrix(cts[,ref_i])
+  
+  # Generating NULL model (test, reference)
+  dnull <- ttestNull(mat_test, mat_ref, per=1000)
+  
+  # Generating signature
+  signature <- rowTtest(mat_test, mat_ref)
+  signature <- (qnorm(signature$p.value/2, lower.tail = FALSE) * sign(signature$statistic))
+  signature <- na.omit(signature)
+  signature <- signature[,1]
+  
+  # Running msVIPER
+  mra <- msviper(signature, regu, dnull, verbose = FALSE)
+
+  # Plot DiffActive TFs
+  png(paste0(getwd(),"Single_cell_DifferentialActive_TFs.png"), width = 1000, height = 800, res=100)
+  print(plot(mra, cex=1, include = c("expression","activity")))
+  dev.off()
+  
+
+```
+
+

@@ -63,15 +63,15 @@ pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
 
 Find markers for NK cells (NK cluster vs all others)
 ```{r}
+Idents(seurat_anndata) <- "singleR.labels" 
 markers_NK = FindMarkers(seurat_anndata, ident.1 = "NK_cell")
-head(markers_NK)
-features = rownames(markers_NK)[1:6]
+head(markers_NK, n = 10)
+features = rownames(markers_NK)[1:10]
 FeaturePlot(seurat_anndata, features = features)
 ```
 
 Extract NK cluster for further analysis
 ```{r}
-Idents(seurat_anndata) <- "singleR.labels" 
 NK = subset(seurat_anndata, idents = "NK_cell", invert = FALSE)
 DimPlot(NK, reduction="umap")
 ```
@@ -91,7 +91,7 @@ Plot samples from bulk based on their clusters
 clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_Vanderbilt.csv", row.names = 1))
 clinical.data <- clinical.data[,c(1,5,6,9,11,13)]
 
-coldata = clinical.data[clinical.data$pt_ID%in%levels(nk@meta.data$sample),]
+coldata = clinical.data[clinical.data$pt_ID%in%levels(NK@meta.data$sample),]
 
 #"R3388_YZ_1"  "R3388_YZ_2"  "R3388_YZ_10" "R3388_YZ_11" "R3388_YZ_18" "R3388_YZ_28" "R3388_YZ_56" "R4163_YZ_16" "R4163_YZ_25"
 # "R3388_YZ_1" ---> Cluster 2
@@ -121,22 +121,25 @@ markers = FindAllMarkers(NK,
                only.pos = T,
                test.use = 'wilcox',
                slot = 'counts')
-head(markers)
-features = rownames(markers)[1:6]
-RidgePlot(NK, features = features, ncol = 3)
-VlnPlot(NK, features = features)
-FeaturePlot(NK, features = features)
+head(markers[which(markers$cluster==0),], n =5)
+head(markers[which(markers$cluster==1),], n =5)
+head(markers[which(markers$cluster==2),], n =5)
+head(markers[which(markers$cluster==3),], n =5)
+features = c("NKG7", "IL7R", "TPSAB1", "UBE2C")
+RidgePlot(NK, features = features, ncol = 2)
+VlnPlot(NK, features = features, ncol = 2)
+FeaturePlot(NK, features = features, ncol = 2)
 ```
 
 Differential expressed markers across NK clusters 0 and 1
 ```{r}
 markers = FindMarkers(NK, ident.1 = "0", ident.2 = "1")
 head(markers, n=20)
-features = rownames(markers)[1:6]
+features = c("NKG7", "GNLY", "KLRD1", "GZMH", "GZMB", "GZMA")
 #features = c('CCL3', 'TIGIT', 'CD69','IRF8','IL2RB','CD160') markers from Pierre-Paul
-FeaturePlot(NK, features = features)
-VlnPlot(NK, features = features)
-RidgePlot(NK, features = features, ncol = 2)
+FeaturePlot(NK, features = features, ncol = 3)
+VlnPlot(NK, features = features, ncol = 3)
+RidgePlot(NK, features = features, ncol = 3)
 ```
 
 TFs inference from single cell data 
@@ -201,11 +204,16 @@ markers = FindAllMarkers(NK,
                only.pos = T,
                test.use = 'wilcox',
                slot = 'counts')
-head(markers)
-features = rownames(markers)[1:6]
-RidgePlot(NK, features = features, ncol = 3)
-VlnPlot(NK, features = features)
-(FeaturePlot(NK, features = features)& 
+
+head(markers[which(markers$cluster==0),], n =5)
+head(markers[which(markers$cluster==1),], n =5)
+head(markers[which(markers$cluster==2),], n =5)
+head(markers[which(markers$cluster==3),], n =5)
+features = c("STAT4", "SOX11", "FOSL2", "E2F4")
+
+RidgePlot(NK, features = features, ncol = 2)
+VlnPlot(NK, features = features, ncol = 2)
+(FeaturePlot(NK, features = features, ncol = 2)& 
   scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
 ```
 
@@ -222,10 +230,10 @@ Differential TFs across cluster 0 vs 1 NK
 ```{r}
 markers = FindMarkers(NK, ident.1 = "0", ident.2 = "1")
 head(markers, n=30)
-features = rownames(markers)[1:6]
-(FeaturePlot(NK, features = features)& 
+features = c("STAT4", "TBX21", "FOSL2", "NR2F2", "BATF", "RUNX1","IRF4","BCL6")
+(FeaturePlot(NK, features = features, ncol = 2)& 
   scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
-VlnPlot(NK, features = features)
+VlnPlot(NK, features = features, ncol = 2)
 RidgePlot(NK, features = features, ncol = 2)
 ```
 
@@ -279,5 +287,23 @@ Features plot of TFs found in bulk analysis
 ```{r}
 (FeaturePlot(NK, features = c("TBX21","PAX5", "LYL1", "HIF1A", "CXXC4")) & 
   scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
+```
+
+Re-clustering using only subset of patients with bulk
+```{r}
+nk2 = subset(NK, subset = Clusters_bulk == cell_values)
+
+ElbowPlot(nk2) #determine dimensionality of data
+nk2<- FindNeighbors(nk2, dims = 1:15)
+nk2<- FindClusters(nk2, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
+nk2<- RunUMAP(nk2, dims = 1:10)
+DimPlot(nk2, reduction="umap", label = T, pt.size = 0.5) + 
+  NoLegend() + ggtitle('NK cells')
+DimPlot(nk2, reduction="umap", group.by = 'Clusters_bulk') + 
+  ggtitle('Samples from bulk')
+```
+
+```{r}
+saveRDS(NK, "nk.rds")
 ```
 
