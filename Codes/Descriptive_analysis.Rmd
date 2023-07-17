@@ -1,0 +1,246 @@
+---
+title: "Descriptive_analysis"
+author: "Marcelo Hurtado"
+date: "2023-07-17"
+output: html_document
+---
+
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+```{r}
+#Import Counts
+Counts <- as.matrix(read.table("/home/marcelo/LungPredict1/RawFiles/LP_STAR_RSEM_matrix_LEILA.txt", header=T, row.names = 1))
+colnames(Counts) = gsub("X.home.leilak.......media.leilak.LaCie.LungPredict.Adenocarcinoma.RSEM.RNAseq_quals.", "", colnames(Counts))
+colnames(Counts) = gsub(".genes.results", "", colnames(Counts))
+Counts <- as.data.frame(Counts)
+Counts$Genes = rownames(Counts)
+
+##Import Clinical data
+clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_LungPredict.csv", row.names = 1))
+clinical.data$Smoking_Status[which(clinical.data$Smoking_Status == 'Old')] <- 'Y' 
+clinical.data$Smoking_Status[which(clinical.data$Smoking_Status == 'Yes')] <- 'Y'
+clinical.data$Smoking_Status[which(clinical.data$Smoking_Status == 'No')] <- 'N'
+```
+
+```{r}
+#install.packages("ggVennDiagram")
+library("ggvenn")# install.packages("ggplot2")
+library(ggplot2)
+
+# List of items
+x <- list(Clinical = rownames(clinical.data), Counts = colnames(Counts))
+
+venn <- Venn(x)
+data <- process_data(venn)
+
+ggplot() +
+  geom_sf(aes(fill=count), data = venn_region(data), show.legend = F) +
+  geom_sf(size = 2, lty = "solid", color = "black", data = venn_setedge(data), show.legend = F) +
+  geom_sf_text(aes(label = name), size=6, data = venn_setlabel(data)) +
+  geom_sf_label(aes(label=count), fontface = "bold", size=6, data = venn_region(data)) +
+  theme_void() +
+  ggplot2::scale_fill_gradient(low="#F1F1F1",high = "#0091D5")
+
+```
+
+```{r}
+p = ggplot(clinical.data, aes(x = factor(Stages_simplified), fill=factor(..count..)), stat="count") +
+  geom_bar(stat = "count", width = 0.6, fill = c("#7E909A", "#1C4E80", "#A5D8DD", "#EA6A47"))+
+  geom_text(aes(label = ..count..),stat = "count", size = 4, vjust=2) +
+  labs(x = "Tumor Stages",
+       y = "Patients",
+       title = "Tumor stages across patients",
+       caption = "Data source: LungPredict",
+       fill = "Tumor Stages") +
+  theme(legend.title = element_text(colour="black", size=10, 
+                                      face="bold"))+
+  scale_fill_discrete(breaks=c('21','10','11', '20'), labels=c('Stage I', 'Stage II','Stage III', 'Stage IV'))
+p 
+```
+```{r}
+# create a dataset
+stages <- c(rep("Stage I" , 2) , rep("Stage II" , 2) , rep("Stage III" , 2) , rep("Stage IV" , 2) )
+condition <- rep(c("Male" , "Female") , 2)
+value <- c(sum(clinical.data$Stages_simplified=="I"&clinical.data$Gender=="M"), sum(clinical.data$Stages_simplified=="I"&clinical.data$Gender=="F"),
+           sum(clinical.data$Stages_simplified=="II"&clinical.data$Gender=="M"), sum(clinical.data$Stages_simplified=="II"&clinical.data$Gender=="F"),
+           sum(clinical.data$Stages_simplified=="III"&clinical.data$Gender=="M"), sum(clinical.data$Stages_simplified=="III"&clinical.data$Gender=="F"),
+           sum(clinical.data$Stages_simplified=="IV"&clinical.data$Gender=="M"), sum(clinical.data$Stages_simplified=="IV"&clinical.data$Gender=="F"))
+data <- data.frame(stages,condition,value)
+ 
+# Dodge
+ggplot(data, aes(fill=as.factor(condition), y=value, x=stages)) + 
+    geom_bar(position="dodge", stat="identity") + 
+    geom_text(aes(label = value), size = 4, vjust=2, position = position_dodge(width = .9)) +
+    labs(x = "Tumor Stages",
+       y = "Patients",
+       title = "Tumor stages across patients",
+       fill = "Gender") +
+  scale_fill_manual(values=c("#1C4E80", "#EA6A47"))
+```
+
+```{r}
+# Compute the position of labels
+data <- count(clinical.data$Batch) %>%
+  mutate(prop = (freq/nrow(clinical.data))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop)
+
+ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
+  theme_void() +
+  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  labs(title = "Patients by batch",
+       fill = "Batch") +
+  scale_fill_manual(values = c("#7E909A", "#1C4E80", "#A5D8DD", "#EA6A47"), labels=c('Batch 1', 'Batch 2', 'Batch 3', 'Batch 4')) 
+
+```
+
+```{r}
+# create a dataset
+mutation <- c(rep("KRAS" , 2) , rep("EGFR" , 2) , rep("STK11" , 2))
+condition <- rep(c("NA" , "Yes") , 3)
+value <- c(count(clinical.data$KRAS_mut)$freq[1], count(clinical.data$KRAS_mut)$freq[2],
+           count(clinical.data$EGFR_mut)$freq[1], count(clinical.data$EGFR_mut)$freq[2],
+           count(clinical.data$STK11_mut)$freq[1], count(clinical.data$STK11_mut)$freq[2])
+data <- data.frame(mutation,condition,value)
+ 
+# Dodge
+ggplot(data, aes(fill=factor(condition), y=value, x=mutation)) + 
+    geom_bar(position="dodge", stat="identity") + 
+    geom_text(aes(label = value), size = 4, hjust= 2, vjust=0.5, color = "black", position = position_dodge(width = .9)) +
+    labs(x = "Mutations",
+       y = "Patients",
+       title = "Mutations presence across patients",
+       fill = "Presence") +
+  scale_fill_manual(values=c("#0091D5", "#EA6A47"))+
+  coord_flip()
+```
+```{r}
+# Compute the position of labels
+data <- count(clinical.data$Metastatic) %>%
+  mutate(prop = (freq/nrow(clinical.data))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop)
+
+ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
+  geom_bar(stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
+  theme_void() +
+  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  labs(title = "Tumor metastasis",
+       fill = "Metastasis") +
+  scale_fill_manual(values = c("#0091D5","#F1F1F1"),breaks = c('Yes', 'No'), labels=c('Yes', 'No')) +
+  xlim(0.5, 2.5)
+```
+
+```{r}
+# Compute the position of labels
+data <- count(clinical.data$Smoking_Status) %>%
+  mutate(prop = (freq/nrow(clinical.data))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop)
+
+ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
+  geom_bar(stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
+  scale_fill_brewer(palette="Pastel1") +
+  theme_void() +
+  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  labs(title = "Patients Smoking Status",
+       fill = "Smoking Status") +
+  scale_fill_manual(values = c("#0091D5","#F1F1F1"),breaks = c('Y', 'N'), labels=c('Old and Current', 'Never')) +
+  xlim(0.5, 2.5)
+```
+
+```{r}
+# Compute the position of labels
+data <- count(clinical.data$Age_Bracket) %>%
+  mutate(prop = (freq/nrow(clinical.data))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop)
+
+ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
+  geom_bar(stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
+  scale_fill_brewer(palette="Pastel1") +
+  theme_void() +
+  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  labs(title = "Patients Age bracket",
+       fill = "Age bracket") +
+  scale_fill_manual(values = c("#0091D5","#EA6A47"),breaks = c('70Plus', 'Less70'), labels=c('More than 70 years old', 'Less than 70 years old')) +
+  xlim(0.5, 2.5)
+```
+
+```{r}
+clinical.data2 <- read.csv("~/LungPredict1/RawFiles/clinic_data_v2_clean.csv", row.names=1)
+# Compute the position of labels
+data <- count(clinical.data2$diagnostic) %>%
+  mutate(prop = (freq/nrow(clinical.data2))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop)
+
+library(ggrepel)
+
+# Get the positions
+df2 <- data %>% 
+  mutate(csum = rev(cumsum(rev(round(prop)))), 
+         pos = round(prop)/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), round(prop)/2, pos))
+
+ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
+  geom_bar(stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  theme_void() +
+  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  labs(title = "Patients diagnostic",
+       fill = "Diagnostic") +
+  scale_fill_manual(values = c("#0091D5","#EA6A47", '#A5D8DD', '#7E909A'),breaks = c('Adénocarcinome', 'Epidermoïde', 'Tumeur neuroendocrine', 'Autre'), 
+                    labels=c('Adenocarcinoma', 'Epidermoïde', 'Tumeur neuroendocrine', 'Other')) +
+  xlim(0.5, 2.5) +
+  geom_label_repel(data = df2,
+                   aes(y = pos, label = paste0(round(prop), "%")),
+                   size = 4.5, nudge_x = 1, show.legend = FALSE)
+
+ggplot(data, aes(x = "" , y = round(prop), fill = as.factor(x))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_brewer(palette = "Pastel1") +
+  geom_label_repel(data = df2,
+                   aes(y = pos, label = paste0(round(prop), "%")),
+                   size = 4.5, nudge_x = 1, show.legend = FALSE) +
+  guides(fill = guide_legend(title = "x")) +
+  theme_void()
+
+```
+```{r}
+tata3 <- data.frame(
+    Subtype = c("Prostate", "Oesophagus", "Breasr"),
+    alive = c(88, 22, 100), dead = c(12, 55, 17),
+    uncertain = c(10, 2, 2), total = c(186,46,202))
+
+tata3 %>% 
+    mutate(csum = rev(cumsum(rev(total))), 
+           pos = total/2 + lead(csum, 1),
+           pos = if_else(is.na(pos), total/2, pos),
+           percentage = total/sum(total)) %>% 
+    ggplot(aes(x = "", y = total, fill = fct_inorder(Subtype))) + 
+    geom_col(width = 1, color = 1) +
+    geom_label_repel(aes(y = pos,
+                         label = glue::glue("{total} ({scales::percent(percentage)})"), 
+                         fill = Subtype),
+                     size = 3,
+                     nudge_x = 3,
+                     show.legend = FALSE) +
+    labs(  fill = "Subtype" ) +
+    coord_polar(theta = "y") +
+    theme_void()
+```
+
