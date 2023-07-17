@@ -20,30 +20,6 @@ Counts$Genes = rownames(Counts)
 
 ##Import Clinical data
 clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_LungPredict.csv", row.names = 1))
-clinical.data$Smoking_Status[which(clinical.data$Smoking_Status == 'Old')] <- 'Y' 
-clinical.data$Smoking_Status[which(clinical.data$Smoking_Status == 'Yes')] <- 'Y'
-clinical.data$Smoking_Status[which(clinical.data$Smoking_Status == 'No')] <- 'N'
-```
-
-```{r}
-#install.packages("ggVennDiagram")
-library("ggvenn")# install.packages("ggplot2")
-library(ggplot2)
-
-# List of items
-x <- list(Clinical = rownames(clinical.data), Counts = colnames(Counts))
-
-venn <- Venn(x)
-data <- process_data(venn)
-
-ggplot() +
-  geom_sf(aes(fill=count), data = venn_region(data), show.legend = F) +
-  geom_sf(size = 2, lty = "solid", color = "black", data = venn_setedge(data), show.legend = F) +
-  geom_sf_text(aes(label = name), size=6, data = venn_setlabel(data)) +
-  geom_sf_label(aes(label=count), fontface = "bold", size=6, data = venn_region(data)) +
-  theme_void() +
-  ggplot2::scale_fill_gradient(low="#F1F1F1",high = "#0091D5")
-
 ```
 
 ```{r}
@@ -60,6 +36,7 @@ p = ggplot(clinical.data, aes(x = factor(Stages_simplified), fill=factor(..count
   scale_fill_discrete(breaks=c('21','10','11', '20'), labels=c('Stage I', 'Stage II','Stage III', 'Stage IV'))
 p 
 ```
+
 ```{r}
 # create a dataset
 stages <- c(rep("Stage I" , 2) , rep("Stage II" , 2) , rep("Stage III" , 2) , rep("Stage IV" , 2) )
@@ -130,13 +107,20 @@ data <- count(clinical.data$Metastatic) %>%
 ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
   geom_bar(stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
-  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
   theme_void() +
   theme(legend.title = element_text(colour="black", size=10, face="bold"))+
   labs(title = "Tumor metastasis",
        fill = "Metastasis") +
-  scale_fill_manual(values = c("#0091D5","#F1F1F1"),breaks = c('Yes', 'No'), labels=c('Yes', 'No')) +
-  xlim(0.5, 2.5)
+  scale_fill_manual(values = c("#0091D5", "#F1F1F1")) +
+  xlim(0.5, 2.5)+
+  annotate("text",
+             label = paste0(round(data$prop[2]), "%"),
+             family = "Inter",
+             fontface = "bold",
+             color = "#0091D5",
+             size = 12,
+             x = 0.5,
+             y = 2.5)
 ```
 
 ```{r}
@@ -146,17 +130,15 @@ data <- count(clinical.data$Smoking_Status) %>%
   arrange(desc(x)) %>%
   mutate(lab.ypos = cumsum(prop) - 0.5*prop)
 
-ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
-  geom_bar(stat = "identity", color = "white") +
+ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
   geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
-  scale_fill_brewer(palette="Pastel1") +
   theme_void() +
   theme(legend.title = element_text(colour="black", size=10, face="bold"))+
-  labs(title = "Patients Smoking Status",
+  labs(title = "Patients by Smoking Status",
        fill = "Smoking Status") +
-  scale_fill_manual(values = c("#0091D5","#F1F1F1"),breaks = c('Y', 'N'), labels=c('Old and Current', 'Never')) +
-  xlim(0.5, 2.5)
+  scale_fill_manual(values = c("#EA6A47", "#1C4E80", "#A5D8DD"), breaks = c('Old', 'No', 'Yes'), labels=c('Old', 'Never', 'Current')) 
 ```
 
 ```{r}
@@ -169,14 +151,20 @@ data <- count(clinical.data$Age_Bracket) %>%
 ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
   geom_bar(stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
-  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
-  scale_fill_brewer(palette="Pastel1") +
   theme_void() +
   theme(legend.title = element_text(colour="black", size=10, face="bold"))+
   labs(title = "Patients Age bracket",
        fill = "Age bracket") +
-  scale_fill_manual(values = c("#0091D5","#EA6A47"),breaks = c('70Plus', 'Less70'), labels=c('More than 70 years old', 'Less than 70 years old')) +
-  xlim(0.5, 2.5)
+  scale_fill_manual(values = c("#F1F1F1","#0091D5"),breaks = c('70Plus', 'Less70'), labels=c('More than 70 years old', 'Less than 70 years old')) +
+  xlim(0.5, 2.5)+
+  annotate("text",
+             label = paste0(round(data$prop[1]), "%"),
+             family = "Inter",
+             fontface = "bold",
+             color = "#0091D5",
+             size = 12,
+             x = 0.5,
+             y = 2.5)
 ```
 
 ```{r}
@@ -189,58 +177,73 @@ data <- count(clinical.data2$diagnostic) %>%
 
 library(ggrepel)
 
-# Get the positions
-df2 <- data %>% 
-  mutate(csum = rev(cumsum(rev(round(prop)))), 
-         pos = round(prop)/2 + lead(csum, 1),
-         pos = if_else(is.na(pos), round(prop)/2, pos))
-
-ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
-  geom_bar(stat = "identity", color = "white") +
+ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
+  geom_col(width = 1, color = 1) +
   coord_polar("y", start = 0)+
   theme_void() +
   theme(legend.title = element_text(colour="black", size=10, face="bold"))+
   labs(title = "Patients diagnostic",
        fill = "Diagnostic") +
   scale_fill_manual(values = c("#0091D5","#EA6A47", '#A5D8DD', '#7E909A'),breaks = c('Adénocarcinome', 'Epidermoïde', 'Tumeur neuroendocrine', 'Autre'), 
-                    labels=c('Adenocarcinoma', 'Epidermoïde', 'Tumeur neuroendocrine', 'Other')) +
-  xlim(0.5, 2.5) +
-  geom_label_repel(data = df2,
-                   aes(y = pos, label = paste0(round(prop), "%")),
-                   size = 4.5, nudge_x = 1, show.legend = FALSE)
+                    labels=c('Adenocarcinoma', 'Epidermoid', 'Neuroendocrine', 'Other')) +
+  geom_label_repel(data = data,
+                   aes(y = lab.ypos, label = freq),
+                   size = 4, nudge_x = 1, show.legend = FALSE) 
 
-ggplot(data, aes(x = "" , y = round(prop), fill = as.factor(x))) +
-  geom_col(width = 1, color = 1) +
-  coord_polar(theta = "y") +
-  scale_fill_brewer(palette = "Pastel1") +
-  geom_label_repel(data = df2,
-                   aes(y = pos, label = paste0(round(prop), "%")),
-                   size = 4.5, nudge_x = 1, show.legend = FALSE) +
-  guides(fill = guide_legend(title = "x")) +
-  theme_void()
 
 ```
-```{r}
-tata3 <- data.frame(
-    Subtype = c("Prostate", "Oesophagus", "Breasr"),
-    alive = c(88, 22, 100), dead = c(12, 55, 17),
-    uncertain = c(10, 2, 2), total = c(186,46,202))
 
-tata3 %>% 
-    mutate(csum = rev(cumsum(rev(total))), 
-           pos = total/2 + lead(csum, 1),
-           pos = if_else(is.na(pos), total/2, pos),
-           percentage = total/sum(total)) %>% 
-    ggplot(aes(x = "", y = total, fill = fct_inorder(Subtype))) + 
-    geom_col(width = 1, color = 1) +
-    geom_label_repel(aes(y = pos,
-                         label = glue::glue("{total} ({scales::percent(percentage)})"), 
-                         fill = Subtype),
-                     size = 3,
-                     nudge_x = 3,
-                     show.legend = FALSE) +
-    labs(  fill = "Subtype" ) +
-    coord_polar(theta = "y") +
-    theme_void()
+```{r}
+# Compute the position of labels
+clinical.data2 <- clinical.data2[which(clinical.data2$diagnostic=="Adénocarcinome"),]
+clinical.data2$puncture_location[which(clinical.data2$puncture_location=="Extra-thoracique")] = "extra-thoracique"
+clinical.data2$puncture_location[which(clinical.data2$puncture_location=="")] = "NA"
+data <- count(clinical.data2$puncture_location) %>%
+  mutate(prop = (freq/nrow(clinical.data2))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop) %>% 
+  mutate(csum = rev(cumsum(rev(round(prop)))), 
+         pos = round(prop)/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), round(prop)/2, pos))
+
+ggplot(data, aes(x = "", y = round(prop), fill = fct_inorder(x))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar("y", start = 0)+
+  theme_void() +
+  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  labs(title = "Number of patients with Adenocarcinoma - Puncture by location",
+       fill = "Location") +
+  scale_fill_manual(values = c("#0091D5", "#1C4E80", "#EA6A47"), breaks=c('extra-thoracique', 'Poumon', 'NA'), labels=c('Extra-thoracic','Lung', 'NA')) +
+  geom_label_repel(data = data,
+                   aes(y = pos, label = freq),
+                   size = 4, nudge_x = 1, show.legend = FALSE)
+
+```
+
+```{r}
+# Compute the position of labels
+data <- count(clinical.data2$type_of_puncture) %>%
+  mutate(prop = (freq/nrow(clinical.data2))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop) %>% 
+  mutate(csum = rev(cumsum(rev(round(prop)))), 
+         pos = round(prop)/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), round(prop)/2, pos))
+
+ggplot(data, aes(x = 2, y = round(prop), fill = fct_inorder(x))) +
+  geom_bar(stat = "identity", color = "white") +
+  coord_polar("y", start = 0)+
+  theme_void() +
+  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  labs(title = "Number of patients with Adenocarcinoma - Type of Puncture",
+       fill = "Type of Puncture") +
+  scale_fill_manual(values = c("#0091D5", "#1C4E80", "#EA6A47"),breaks = c('primaire', 'métastase', ''), labels=c('Primary', 'Metastasis', 'NA')) +
+  geom_label_repel(data = data,
+                   aes(y = pos, label = freq),
+                   size = 4, nudge_x = 1, show.legend = FALSE)
+```
+
+```{r}
+coldata = clinical.data2[rownames(clinical.data2)%in%rownames(clinical.data),]
 ```
 
