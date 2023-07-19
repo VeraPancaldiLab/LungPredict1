@@ -5,7 +5,7 @@ date: "2023-07-17"
 output: html_document
 ---
 
-```{r}
+```{r, include=FALSE}
 source(paste0(getwd(),"/environment_set.R"))
 libraries_set()
 ```
@@ -50,7 +50,7 @@ data <- data.frame(stages,condition,value)
 # Dodge
 ggplot(data, aes(fill=as.factor(condition), y=value, x=stages)) + 
     geom_bar(position="dodge", stat="identity") + 
-    geom_text(aes(label = value), size = 4, vjust=2, position = position_dodge(width = .9)) +
+    geom_text(aes(label = value), size = 6, vjust=2, position = position_dodge(width = .9)) +
     labs(x = "Tumor Stages",
        y = "Patients",
        title = "Tumor stages across patients",
@@ -68,7 +68,7 @@ data <- count(clinical.data$Batch) %>%
 ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   geom_bar(width = 1, stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
-  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
+  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=6, color = "black")+
   theme_void() +
   theme(legend.title = element_text(colour="black", size=10, face="bold"))+
   labs(title = "Patients by batch",
@@ -89,7 +89,7 @@ data <- data.frame(mutation,condition,value)
 # Dodge
 ggplot(data, aes(fill=factor(condition), y=value, x=mutation)) + 
     geom_bar(position="dodge", stat="identity") + 
-    geom_text(aes(label = value), size = 4, hjust= 2, vjust=0.5, color = "black", position = position_dodge(width = .9)) +
+    geom_text(aes(label = value), size = 6, hjust= 2, vjust=0.5, color = "black", position = position_dodge(width = .9)) +
     labs(x = "Mutations",
        y = "Patients",
        title = "Mutations presence across patients",
@@ -108,7 +108,7 @@ ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
   geom_bar(stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
   theme_void() +
-  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  theme(legend.title = element_text(colour="black", size=14, face="bold"))+
   labs(title = "Tumor metastasis",
        fill = "Metastasis") +
   scale_fill_manual(values = c("#0091D5", "#F1F1F1")) +
@@ -133,7 +133,7 @@ data <- count(clinical.data$Smoking_Status) %>%
 ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   geom_bar(width = 1, stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
-  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=4, color = "black")+
+  geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=6, color = "black")+
   theme_void() +
   theme(legend.title = element_text(colour="black", size=10, face="bold"))+
   labs(title = "Patients by Smoking Status",
@@ -166,9 +166,13 @@ ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
              x = 0.5,
              y = 2.5)
 ```
-
 ```{r}
 clinical.data2 <- read.csv("~/LungPredict1/RawFiles/clinic_data_v2_clean.csv", row.names=1)
+clinical.data2$puncture_location[which(clinical.data2$puncture_location=="Extra-thoracique")] = "extra-thoracique"
+clinical.data2$puncture_location[which(clinical.data2$puncture_location=="")] = "NA"
+```
+
+```{r}
 # Compute the position of labels
 data <- count(clinical.data2$diagnostic) %>%
   mutate(prop = (freq/nrow(clinical.data2))*100) %>%
@@ -184,66 +188,67 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   theme(legend.title = element_text(colour="black", size=10, face="bold"))+
   labs(title = "Patients diagnostic",
        fill = "Diagnostic") +
-  scale_fill_manual(values = c("#0091D5","#EA6A47", '#A5D8DD', '#7E909A'),breaks = c('Adénocarcinome', 'Epidermoïde', 'Tumeur neuroendocrine', 'Autre'), 
+  scale_fill_manual(values = c("#EA6A47","#7E909A", '#A5D8DD', '#F1F1F1'),breaks = c('Adénocarcinome', 'Epidermoïde', 'Tumeur neuroendocrine', 'Autre'), 
                     labels=c('Adenocarcinoma', 'Epidermoid', 'Neuroendocrine', 'Other')) +
   geom_label_repel(data = data,
                    aes(y = lab.ypos, label = freq),
-                   size = 4, nudge_x = 1, show.legend = FALSE) 
+                   size = 4, nudge_x = 1, show.legend = F) 
 
 
 ```
-
 ```{r}
-# Compute the position of labels
-clinical.data2 <- clinical.data2[which(clinical.data2$diagnostic=="Adénocarcinome"),]
-clinical.data2$puncture_location[which(clinical.data2$puncture_location=="Extra-thoracique")] = "extra-thoracique"
-clinical.data2$puncture_location[which(clinical.data2$puncture_location=="")] = "NA"
-data <- count(clinical.data2$puncture_location) %>%
-  mutate(prop = (freq/nrow(clinical.data2))*100) %>%
-  arrange(desc(x)) %>%
-  mutate(lab.ypos = cumsum(prop) - 0.5*prop) %>% 
-  mutate(csum = rev(cumsum(rev(round(prop)))), 
-         pos = round(prop)/2 + lead(csum, 1),
-         pos = if_else(is.na(pos), round(prop)/2, pos))
 
-ggplot(data, aes(x = "", y = round(prop), fill = fct_inorder(x))) +
-  geom_col(width = 1, color = 1) +
-  coord_polar("y", start = 0)+
-  theme_void() +
-  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
-  labs(title = "Number of patients with Adenocarcinoma - Puncture by location",
-       fill = "Location") +
-  scale_fill_manual(values = c("#0091D5", "#1C4E80", "#EA6A47"), breaks=c('extra-thoracique', 'Poumon', 'NA'), labels=c('Extra-thoracic','Lung', 'NA')) +
-  geom_label_repel(data = data,
-                   aes(y = pos, label = freq),
-                   size = 4, nudge_x = 1, show.legend = FALSE)
-
-```
-
-```{r}
-# Compute the position of labels
-data <- count(clinical.data2$type_of_puncture) %>%
-  mutate(prop = (freq/nrow(clinical.data2))*100) %>%
-  arrange(desc(x)) %>%
-  mutate(lab.ypos = cumsum(prop) - 0.5*prop) %>% 
-  mutate(csum = rev(cumsum(rev(round(prop)))), 
-         pos = round(prop)/2 + lead(csum, 1),
-         pos = if_else(is.na(pos), round(prop)/2, pos))
-
-ggplot(data, aes(x = 2, y = round(prop), fill = fct_inorder(x))) +
-  geom_bar(stat = "identity", color = "white") +
-  coord_polar("y", start = 0)+
-  theme_void() +
-  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
-  labs(title = "Number of patients with Adenocarcinoma - Type of Puncture",
-       fill = "Type of Puncture") +
-  scale_fill_manual(values = c("#0091D5", "#1C4E80", "#EA6A47"),breaks = c('primaire', 'métastase', ''), labels=c('Primary', 'Metastasis', 'NA')) +
-  geom_label_repel(data = data,
-                   aes(y = pos, label = freq),
-                   size = 4, nudge_x = 1, show.legend = FALSE)
-```
-
-```{r}
 coldata = clinical.data2[rownames(clinical.data2)%in%rownames(clinical.data),]
+coldata$puncture_location[which(coldata$puncture_location=="extra-thoracique")] = "Extra-thoracique"
+coldata$puncture_location[which(coldata$puncture_location=="Poumon")] = "Lung"
+coldata$type_of_puncture[which(coldata$type_of_puncture=="primaire")] = "Primary"
+coldata$type_of_puncture[which(coldata$type_of_puncture=="métastase")] = "Metastasis"
 ```
+
+```{r}
+# Compute the position of labels
+data <- count(coldata$puncture_location) %>%
+  mutate(prop = (freq/nrow(coldata))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop) %>% 
+  mutate(csum = rev(cumsum(rev(round(prop)))), 
+         pos = round(prop)/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), round(prop)/2, pos))
+
+ggplot(data, aes(fill=factor(x), y=freq, x=x)) + 
+    geom_bar(stat="identity", width = 0.65, position=position_dodge(.9)) + 
+    geom_text(aes(label = freq), size = 6, hjust= 2, vjust=0.5, color = "black", position = position_dodge(width = .9)) +
+    labs(x = "Puncture",
+       y = "Patients",
+       fill = "Puncture location") +
+  scale_fill_manual(values=c("#0091D5", "#A5D8DD"),breaks = c('Lung','Extra-thoracique'))+
+  coord_flip()
+
+```
+
+```{r}
+# Compute the position of labels
+data <- count(coldata$type_of_puncture) %>%
+  mutate(prop = (freq/nrow(coldata))*100) %>%
+  arrange(desc(x)) %>%
+  mutate(lab.ypos = cumsum(prop) - 0.5*prop) %>% 
+  mutate(csum = rev(cumsum(rev(round(prop)))), 
+         pos = round(prop)/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), round(prop)/2, pos))
+
+ggplot(data, aes(fill=factor(x), y=freq, x=x)) + 
+    geom_bar(stat="identity", width = 0.65, position=position_dodge(.9)) + 
+    geom_text(aes(label = freq), size = 6, hjust= 2, vjust=0.5, color = "black", position = position_dodge(width = .9)) +
+    labs(x = "Puncture",
+       y = "Patients",
+       fill = "Type of puncture") +
+  scale_fill_manual(values=c("#1C4E80", "#EA6A47"),breaks = c('Primary', 'Metastasis'))+
+  coord_flip()
+```
+
+```{r}
+coldata = clinical.data2[which(rownames(clinical.data2)%in%rownames(clinical.data)),]
+coldata = coldata[coldata$diagnostic=="Adénocarcinome",]
+```
+
 

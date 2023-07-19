@@ -61,56 +61,51 @@ tab = table(Assigned = pred$labels, Clusters = seurat_anndata$seurat_clusters)
 pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
 ```
 
-Find markers for NK cells (NK cluster vs all others)
 ```{r}
-Idents(seurat_anndata) <- "singleR.labels" 
-markers_NK = FindMarkers(seurat_anndata, ident.1 = "NK_cell")
-head(markers_NK, n = 10)
-features = rownames(markers_NK)[1:10]
-FeaturePlot(seurat_anndata, features = features)
+Idents(seurat_anndata) = seurat_anndata@meta.data$singleR.labels
+cells = subset(seurat_anndata, idents = c('NK_cell', 'B_cell', 'DC', 'Endothelial_cells', 'Macrophage', 'Monocyte', 'Neutrophils', 'T_cells', 'Fibroblasts', 'Epithelial_cells'), invert = FALSE)
+saveRDS(cells, "cells.rds")
 ```
+
+Find markers for NK cells (NK cluster vs all others)
 
 Extract NK cluster for further analysis
 ```{r}
-NK = subset(seurat_anndata, idents = "NK_cell", invert = FALSE)
+NK = subset(seurat_anndata, idents = c(8,2,6), invert = FALSE)
 DimPlot(NK, reduction="umap")
-```
-
-Cluster identification using NK cells
-```{r}
 ElbowPlot(NK) #determine dimensionality of data
-NK<- FindNeighbors(NK, dims = 1:10)
+NK<- FindNeighbors(NK, dims = 1:20)
 NK<- FindClusters(NK, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
-NK<- RunUMAP(NK, dims = 1:10)
+NK<- RunUMAP(NK, dims = 1:20)
 DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) + 
   NoLegend() + ggtitle('NK cells')
 ```
-
-Plot samples from bulk based on their clusters 
+Extract macrophages cluster for further analysis
 ```{r}
-clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_Vanderbilt.csv", row.names = 1))
-clinical.data <- clinical.data[,c(1,5,6,9,11,13)]
+macrophages = subset(seurat_anndata, idents = 12, invert = FALSE)
+DimPlot(macrophages, reduction="umap")
+ElbowPlot(macrophages) #determine dimensionality of data
+macrophages<- FindNeighbors(macrophages, dims = 1:10)
+macrophages<- FindClusters(macrophages, algorithm= 1, resolution = 0.1, verbose = T, graph.name = "RNA_snn")
+macrophages<- RunUMAP(macrophages, dims = 1:10)
+DimPlot(macrophages, reduction="umap", label = T, pt.size = 0.5) + 
+  NoLegend() + ggtitle('Macrophages cells')
+```
 
-coldata = clinical.data[clinical.data$pt_ID%in%levels(NK@meta.data$sample),]
+```{r}
+Idents(NK) 
+new.cluster.ids <- c("Cluster1", "Cluster2", "Cluster3")
+names(new.cluster.ids) <- levels(NK)
+NK <- RenameIdents(NK, new.cluster.ids)
 
-#"R3388_YZ_1"  "R3388_YZ_2"  "R3388_YZ_10" "R3388_YZ_11" "R3388_YZ_18" "R3388_YZ_28" "R3388_YZ_56" "R4163_YZ_16" "R4163_YZ_25"
-# "R3388_YZ_1" ---> Cluster 2
-# "R3388_YZ_2"  ---> Cluster 1
-# "R3388_YZ_10" ---> Cluster 1
-# "R3388_YZ_28" ---> Cluster 1
 
-cluster1 = c("14965", "11817", "12929") #"R3388_YZ_2", "R3388_YZ_10", "R3388_YZ_28"
-cluster2 = c("14958") #R3388_YZ_1
+Idents(macrophages) 
+new.cluster.ids <- c("Cluster1", "Cluster2", "Cluster3")
+names(new.cluster.ids) <- levels(macrophages)
+macrophages <- RenameIdents(macrophages, new.cluster.ids)
 
-NK[['Clusters_bulk']] = FALSE
-NK@meta.data$Clusters_bulk[which(NK@meta.data$sample%in%cluster1)] = 'Bulk cluster 1'
-NK@meta.data$Clusters_bulk[which(NK@meta.data$sample%in%cluster2)] = 'Bulk cluster 2'
-cell_values <- c("Bulk cluster 1", "Bulk cluster 2")
-nk2 = subset(NK, subset = Clusters_bulk == cell_values)
-
-p2 = DimPlot(nk2, reduction="umap", group.by = 'Clusters_bulk') + 
-  ggtitle('Samples from bulk')
-p2
+saveRDS(NK, "nk2.rds")
+saveRDS(macrophages, "macrophages.rds")
 ```
 
 Find all markers across the different NK subclusters
@@ -163,20 +158,31 @@ regulons <- dorothea_hs %>%
 
 Extracting only variable features from NK cluster to calculate TFs activity
 ```{r}
-NK <- FindVariableFeatures(NK, selection.method = "vst", nfeatures = 10000)
+NK <- FindVariableFeatures(NK, selection.method = "vst")
 var_feat = VariableFeatures(NK)
 nk_top <- GetAssayData(NK)[var_feat,]
+
+macrophages <- FindVariableFeatures(macrophages, selection.method = "vst")
+var_feat = VariableFeatures(macrophages)
+macrophages_top <- GetAssayData(macrophages)[var_feat,]
 ```
 
 Run Univariate linear model (ULM) of TFs in NK object
 ```{r}
 # Extract the normalized log-transformed counts
 mat <- as.matrix(nk_top)
-
 # Run ulm
 acts <- run_ulm(mat=mat, net=regulons, .source='tf', .target='target',
                 .mor='mor', minsize = 5)
 head(acts)
+
+# Extract the normalized log-transformed counts
+mat <- as.matrix(macrophages_top)
+# Run ulm
+acts <- run_ulm(mat=mat, net=regulons, .source='tf', .target='target',
+                .mor='mor', minsize = 5)
+head(acts)
+
 ```
 
 Save TFs results in Seurat object
@@ -194,6 +200,24 @@ DefaultAssay(object = NK) <- "tfsulm"
 # Scale the data
 NK <- ScaleData(NK)
 NK@assays$tfsulm@data <- NK@assays$tfsulm@scale.data
+saveRDS(NK, "nk2.rds")
+
+#==================================================================================================
+
+# Extract ulm and store it in tfsulm in pbmc
+macrophages[['tfsulm']] <- acts %>%
+  pivot_wider(id_cols = 'source', names_from = 'condition',
+              values_from = 'score') %>%
+  column_to_rownames('source') %>%
+  Seurat::CreateAssayObject(.)
+
+# Change assay
+DefaultAssay(object = macrophages) <- "tfsulm"
+
+# Scale the data
+macrophages <- ScaleData(macrophages)
+macrophages@assays$tfsulm@data <- macrophages@assays$tfsulm@scale.data
+saveRDS(macrophages, "macrophages.rds")
 ```
 
 Find all TFs markers of NK subclusters

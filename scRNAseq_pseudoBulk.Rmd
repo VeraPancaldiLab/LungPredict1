@@ -16,25 +16,116 @@ libraries_set()
 
 Load data 
 ```{r}
-NK = readRDS("nk.rds")
+NK = readRDS("nk2.rds")
+macrophages = readRDS("macrophages.rds")
+levels(Idents(NK))
+levels(Idents(macrophages))
+```
+```{r}
+DimPlot(NK, reduction="umap")
+ElbowPlot(NK) #determine dimensionality of data
+NK<- FindNeighbors(NK, dims = 1:15)
+NK<- FindClusters(NK, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
+NK<- RunUMAP(NK, dims = 1:15)
+DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) + 
+  NoLegend() + ggtitle('NK cells TF activity')
+```
+```{r}
+markers = FindAllMarkers(NK,
+               logfc.threshold = 0.25, #min logfc 
+               min.pct = 0.1, #genes that are detected on 50% frequency across clusters
+               only.pos = T,
+               test.use = 'wilcox',
+               slot = 'counts')
+head(markers[which(markers$cluster==0),], n =5)
+head(markers[which(markers$cluster==1),], n =5)
+head(markers[which(markers$cluster==2),], n =5)
+```
+```{r}
+DimPlot(macrophages, reduction="umap")
+ElbowPlot(macrophages) #determine dimensionality of data
+macrophages<- FindNeighbors(macrophages, dims = 1:15)
+macrophages<- FindClusters(macrophages, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
+macrophages<- RunUMAP(macrophages, dims = 1:15)
+DimPlot(macrophages, reduction="umap", label = T, pt.size = 0.5) + 
+  NoLegend() + ggtitle('Macrophages cells TF activity')
+```
+
+```{r}
+markers = FindAllMarkers(macrophages,
+               logfc.threshold = 0.25, #min logfc 
+               min.pct = 0.1, #genes that are detected on 50% frequency across clusters
+               only.pos = T,
+               test.use = 'wilcox',
+               slot = 'counts')
+head(markers[which(markers$cluster==0),], n =20)
+head(markers[which(markers$cluster==1),], n =20)
 ```
 
 Pseudo-bulk workflow
 ```{r}
 # 1. counts matrix - sample level
-View(NK@meta.data) # Acquiring necessary metrics for aggregation across cells in a sample
+View(macrophages@meta.data) # Acquiring necessary metrics for aggregation across cells in a sample
 DefaultAssay(NK)
-
+NK$samples <- paste0("NK.", Idents(NK))
 # counts aggregate to sample level
 cts <- AggregateExpression(NK, 
-                    group.by = c("singleR.labels", "sample"),
-                    assays = 'tfsulm',
+                    group.by = c("samples", "sample"),
+                    assays = 'RNA',
                     slot = "counts",
                     return.seurat = FALSE)
-cts <- cts$tfsulm
+
+macrophages$samples <- paste0("Macrophages.", Idents(macrophages))
+# counts aggregate to sample level
+cts <- AggregateExpression(macrophages, 
+                    group.by = c("samples", "sample"),
+                    assays = 'RNA',
+                    slot = "counts",
+                    return.seurat = FALSE)
+
+cts <- cts$RNA
 
 cts.t <- t(cts) # transpose
 cts.t <- as.data.frame(cts.t)
+
+# get values where to split
+splitRows <- gsub('_.*', '', rownames(cts.t))
+
+
+# split data.frame
+cts.split <- split.data.frame(cts.t,
+                 f = factor(splitRows))
+
+# fix colnames and transpose
+
+cts.split.modified <- lapply(cts.split, function(x){
+  rownames(x) <- gsub('.*_(.*)', '\\1', rownames(x))
+  t(x)
+  
+})
+
+dt1 = cts.split.modified$NK.Cluster1
+colnames(dt1) = paste0(colnames(dt1), "_version1_nk")
+dt2 = cts.split.modified$NK.Cluster2
+colnames(dt2) = paste0(colnames(dt2), "_version2_nk")
+dt3 = cts.split.modified$NK.Cluster3
+colnames(dt3) = paste0(colnames(dt3), "_version3_nk")
+
+dt1.2 = cts.split.modified2$Macrophages.Cluster1
+colnames(dt1.2) = paste0(colnames(dt1.2), "_version1_macro")
+dt2.2 = cts.split.modified2$Macrophages.Cluster2
+colnames(dt2.2) = paste0(colnames(dt2.2), "_version2_macro")
+dt3.2 = cts.split.modified2$Macrophages.Cluster3
+colnames(dt3.2) = paste0(colnames(dt3.2), "_version3_macro")
+
+
+data = cbind(dt1, dt2, dt3, dt1.2, dt2.2, dt3.2)
+colnames(data)
+hc <- as.dendrogram(hclust(dist(scale(t(data))), method = "ward.D"))
+png(paste0(getwd(),"/Figures/Heatmaps/New2/TFs_clusters_EARLYSTAGE.png"), width = 7500, height = 4500, res=250)
+plot(hc)
+rect.dendrogram(hc, k = 2,horiz=F)
+dev.off()
 ```
 
 ```{r}
