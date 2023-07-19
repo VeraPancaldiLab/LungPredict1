@@ -1,0 +1,82 @@
+---
+title: "Vanderbilt mutations"
+author: "Marcelo Hurtado"
+date: "2023-02-13"
+output: html_document
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Input
+```{r}
+laml = read.maf(maf = paste0(getwd(),'/Input/TwistWES.maf'))
+data = laml@data
+data_KRAS = data[Hugo_Symbol =="KRAS",]
+pt_ID <- sapply(strsplit(data_KRAS$Tumor_Sample_Barcode, "pt"), "[[", 2)
+pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
+
+CDE <- read.csv(paste0(getwd(),"/RawFiles/ColumnData_Vanderbilt.csv"), row.names = 1)
+CDE <- CDE[match(pt_ID, CDE$pt_ID),]
+```
+
+Mutation table
+```{r}
+x = getClinicalData(laml)
+x$Tumor_Sample_Barcode = as.character(x$Tumor_Sample_Barcode)
+pt_ID <- sapply(strsplit(as.character(x$Tumor_Sample_Barcode), "pt"), "[[", 2)
+pt_ID <- sapply(strsplit(pt_ID, "_"), "[[", 1)
+dataset = "VanIP"
+
+CDE <- cbind('Tumor_Sample_Barcode'=x$Tumor_Sample_Barcode, CDE)
+
+mut = read.maf(maf = paste0(getwd(),'/Input/TwistWES.maf'), clinicalData = CDE)
+
+mut_df <- mut@data
+h_sym <- unique(mut_df$Hugo_Symbol)
+pt_ID <- unique(mut_df$Tumor_Sample_Barcode)
+
+mut_dt <- matrix(0, nrow=length(h_sym), ncol=length(pt_ID))
+rownames(mut_dt) <- h_sym
+colnames(mut_dt) <- pt_ID
+
+for (i in 1:length(h_sym)){
+  k <- which(mut_df$Hugo_Symbol == h_sym[i])
+  pt <- mut_df$Tumor_Sample_Barcode[k]
+  mut_dt[i,pt] <- 1
+}
+
+colnames(mut_dt) <- sapply(strsplit(as.character(pt_ID), "pt"), "[[", 2)
+colnames(mut_dt) <- sapply(strsplit(colnames(mut_dt), "_"), "[[", 1)
+mut_dt <- t(mut_dt)
+
+# Compute mutational load (number of mutations per patient)
+mut_load <- data.frame(table(mut_df$Tumor_Sample_Barcode))
+colnames(mut_load) <- c('pt_ID', 'mut_load')
+mut_load$pt_ID <- sapply(strsplit(as.character(mut_load$pt_ID), "pt"), "[[", 2)
+mut_load$pt_ID <- sapply(strsplit(as.character(mut_load$pt_ID), "_"), "[[", 1)
+
+# Remove genes that are mutated in less than X% of samples
+prcnt <- 0.1 # cutoff: genes must be mutated in >10 % of the samples
+mut_dt_sum <- data.frame(t(mut_dt)) %>% 
+  mutate(sum = rowSums(., na.rm = TRUE), 
+         genes = rownames(.)) %>%
+  arrange(., desc(sum)) %>%
+  dplyr::select(genes, sum) %>%
+  filter(., sum > nrow(mut_dt)*prcnt)
+
+mut_dt <- data.frame(mut_dt[,mut_dt_sum$genes]) %>%
+  mutate(pt_ID=rownames(.))%>%
+  left_join(mut_load, ., by = 'pt_ID')
+
+rownames(mut_dt) = rownames(CDE)
+```
+
+Save mutations file
+```{r}
+write.csv(mut_dt, paste0(getwd(),"/Input/ClinicalData/Mutations_Vanderbilt.csv"), row.names = F)
+```
+
