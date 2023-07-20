@@ -36,7 +36,7 @@ colors = colorRampPalette( rev(brewer.pal(9, "Purples")) )(255)
 pheatmap(SampleDistMatrix, clustering_distance_rows = SampleDist, clustering_distance_cols = SampleDist, col=colors)
 
 #Check features numbers
-table(clinical.data$Stages_simplified)
+table(clinical.data$Stages_simplified) 
 table(clinical.data$Gender)
 table(clinical.data$Metastatic)
 table(clinical.data$Smoking_Status)
@@ -186,9 +186,10 @@ clinical.data2$Batch[which(clinical.data2$Batch == '2')] <- '6'
 clinical.data = rbind(clinical.data1, clinical.data2)
 
 clinical.data = clinical.data[-which(clinical.data$Stages_simplified%in%c('III', 'IV')),]
+Counts1 = Counts1[,colnames(Counts1)%in%rownames(clinical.data)]
 
 #Save data files
-write.csv(Counts, paste0(getwd(),"/Input/Counts/Counts_LPVan_Early.csv"), row.names = T)
+write.csv(Counts1, paste0(getwd(),"/Input/Counts/Counts_LPVan_Early.csv"), row.names = T)
 write.csv(clinical.data, paste0(getwd(),"/Input/ClinicalData/ClinicalData_LPVan_Early.csv"), row.names = T)
 ```
 
@@ -270,5 +271,8 @@ clinical.data = cbind(clinical.data, KRAS[,-which(colnames(KRAS)%in%colnames(cli
 #Save data files
 write.csv(Counts, paste0(getwd(),"/Input/Counts/Counts_KRAS.csv"), row.names = T)
 write.csv(clinical.data, paste0(getwd(),"/Input/ClinicalData/ClinicalData_KRAS.csv"), row.names = T)
+```
+```{r}
+
 ```
 

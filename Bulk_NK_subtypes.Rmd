@@ -1,0 +1,136 @@
+---
+title: "Bulk NK_subtypes"
+author: "Marcelo Hurtado"
+date: "2023-06-29"
+output: html_document
+---
+
+Early Stage Analysis
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Input data 
+```{r}
+Counts <- read.csv("~/LungPredict1/Output/Counts_normalized_vsd_LPVan_Early.csv", row.names=1)
+deconv <- as.matrix(read.delim("~/LungPredict1/Input/Deconvolution/Deconvolution_LPVan_Early.txt", row.names=1))
+clinical.data = read.csv("~/LungPredict1/Input/ClinicalData/ClinicalData_LPVan_Early.csv", row.names=1)
+clinical.data = clinical.data[-which(clinical.data$Batch==6),]
+deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
+Counts = Counts[,colnames(Counts)%in%rownames(clinical.data)]
+```
+
+Patients classification based on NK subgroups found 
+```{r}
+idx = c("Epidish_CCLE_TIL10_NK.cells","CBSX__CCLE.TIL10__NK.cells", "Epidish_TIL10_NK.cells", "CBSX__TIL10__NK.cells")
+idy = c("DeconRNASeq_Fig2ab.NSCLC_PBMCs_scRNAseq_sigmatrix_NK.cells","DeconRNASeq_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_NK.cells")
+
+NK_sub1 = deconv[,which(colnames(deconv)%in%idx)]
+NK_sub2 = deconv[,which(colnames(deconv)%in%idy)]
+pt_ID = c()
+data = NK_sub2
+for (i in 1:ncol(data)) {
+  patients = rownames(data)[which(data[,i]>summary(data[,i])[5])]
+  pt_ID = c(pt_ID, patients)
+}
+pt_ID1 = unique(pt_ID)
+pt_ID2 = unique(pt_ID)
+
+x = c()
+for (i in 1:length(pt_ID1)) {
+  if((pt_ID1[i]%in%pt_ID2)==T){
+    x = c(x, pt_ID1[i])
+  }
+}
+pt_ID1 = pt_ID1[-which(pt_ID1%in%x)]
+pt_ID2 = pt_ID2[-which(pt_ID2%in%x)]
+
+clinical.data$NK = "na"
+clinical.data$NK[rownames(clinical.data)%in%pt_ID1] = "NK_cluster_1"
+clinical.data$NK[rownames(clinical.data)%in%pt_ID2] = "NK_cluster_2"
+table(clinical.data$NK)
+```
+
+Differential expression analysis between patients classified by NK subgroups (HIGH vs LOW)
+```{r}
+compute_msVIPER_scores(Counts, "NK_cluster_1", "NK_cluster_2", clinical.data$NK, "EARLYSTAGE")
+```
+
+###########################################################################################
+
+Late Stage Analysis
+
+Load input data
+```{r}
+deconv1 <- as.matrix(read.csv(paste0(getwd(),"/Input/Deconvolution/Deconvolution_LungPredict.csv"), row.names = 1))
+clinical.data1 <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_LungPredict.csv"), row.names = 1)
+deconv2 <- as.matrix(read.csv(paste0(getwd(),"/Input/Deconvolution/Deconvolution_ImmunoPredict.csv"), row.names = 1))
+clinical.data2 <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_ImmunoPredict.csv"), row.names = 1)
+Counts <- read.csv("~/LungPredict1/Output/Counts_normalized_vsd_Response.csv", row.names=1)
+response <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_Response.csv"), row.names = 1)
+```
+
+Data formatting for response
+```{r}
+clinical.data1$EGFR_mut = NULL
+clinical.data1$STK11_mut = NULL
+clinical.data1$Metastatic = NULL
+
+clinical.data = rbind(clinical.data1, clinical.data2)
+clinical.data = clinical.data[which(clinical.data$Stages_simplified=="IV"),] #38 SAMPLES
+
+deconv = rbind(deconv1, deconv2)
+deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
+
+response = response[rownames(response)%in%rownames(clinical.data),]
+
+clinical.data = clinical.data[rownames(clinical.data)%in%rownames(response),]
+clinical.data$response = response$response
+
+clinical.data = clinical.data[-which(clinical.data$response=="No data"),]
+deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
+
+Counts = Counts[,colnames(Counts)%in%rownames(clinical.data)]
+m2 <- do.call(rbind, strsplit(rownames(Counts), split="_", fixed = TRUE))
+Counts = as.matrix(Counts)
+rownames(Counts) = m2[,2]
+```
+
+Patients classification based on NK subgroups
+```{r}
+idx = c("Quantiseq_NK_cell","DeconRNASeq_BPRNACanProMet_NK", "CBSX__LM22__NK_cells_resting")
+idy = c("DeconRNASeq_scRNA.Seq_melanoma_Tirosh_sigmatrix_SuppFig_3.b_NK.cells", "CBSX__LM22__NK_cells_activated")
+
+NK_sub1 = deconv[,which(colnames(deconv)%in%idx)]
+NK_sub2 = deconv[,which(colnames(deconv)%in%idy)]
+pt_ID = c()
+data = NK_sub2
+for (i in 1:ncol(data)) {
+  patients = rownames(data)[which(data[,i]>summary(data[,i])[5])]
+  pt_ID = c(pt_ID, patients)
+}
+pt_ID1 = unique(pt_ID)
+pt_ID2 = unique(pt_ID)
+
+x = c()
+for (i in 1:length(pt_ID1)) {
+  if((pt_ID1[i]%in%pt_ID2)==T){
+    x = c(x, pt_ID1[i])
+  }
+}
+pt_ID1 = pt_ID1[-which(pt_ID1%in%x)]
+pt_ID2 = pt_ID2[-which(pt_ID2%in%x)]
+
+clinical.data$NK = "na"
+clinical.data$NK[rownames(clinical.data)%in%pt_ID1] = "NK_cluster_1"
+clinical.data$NK[rownames(clinical.data)%in%pt_ID2] = "NK_cluster_2"
+table(clinical.data$NK)
+```
+
+Differential analysis between set of patients
+```{r}
+compute_msVIPER_scores(Counts, "NK_cluster_1", "NK_cluster_2", clinical.data$NK, "LateStage")
+```

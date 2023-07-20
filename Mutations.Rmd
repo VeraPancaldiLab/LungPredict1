@@ -1,5 +1,5 @@
 ---
-title: "Vanderbilt mutations"
+title: "Vanderbilt Mutations"
 author: "Marcelo Hurtado"
 date: "2023-02-13"
 output: html_document
@@ -11,7 +11,7 @@ source(paste0(getwd(),"/environment_set.R"))
 libraries_set()
 ```
 
-Input
+Load data mutations from Vanderbilt
 ```{r}
 laml = read.maf(maf = paste0(getwd(),'/Input/TwistWES.maf'))
 data = laml@data

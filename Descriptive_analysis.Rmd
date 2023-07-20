@@ -11,6 +11,7 @@ source(paste0(getwd(),"/environment_set.R"))
 libraries_set()
 ```
 
+Load Raw data from LungPredict
 ```{r}
 #Import Counts
 Counts <- as.matrix(read.table("/home/marcelo/LungPredict1/RawFiles/LP_STAR_RSEM_matrix_LEILA.txt", header=T, row.names = 1))
@@ -22,8 +23,9 @@ Counts <- as.data.frame(Counts)
 clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_LungPredict.csv", row.names = 1))
 ```
 
+Number of patients across Stages 
 ```{r}
-p = ggplot(clinical.data, aes(x = factor(Stages_simplified), fill=factor(..count..)), stat="count") +
+ggplot(clinical.data, aes(x = factor(Stages_simplified), fill=factor(..count..)), stat="count") +
   geom_bar(stat = "count", width = 0.6, fill = c("#7E909A", "#1C4E80", "#A5D8DD", "#EA6A47"))+
   geom_text(aes(label = ..count..),stat = "count", size = 4, vjust=2) +
   labs(x = "Tumor Stages",
@@ -34,9 +36,8 @@ p = ggplot(clinical.data, aes(x = factor(Stages_simplified), fill=factor(..count
   theme(legend.title = element_text(colour="black", size=10, 
                                       face="bold"))+
   scale_fill_discrete(breaks=c('21','10','11', '20'), labels=c('Stage I', 'Stage II','Stage III', 'Stage IV'))
-p 
 ```
-
+Number of patients across Stages split by Gender
 ```{r}
 # create a dataset
 stages <- c(rep("Stage I" , 2) , rep("Stage II" , 2) , rep("Stage III" , 2) , rep("Stage IV" , 2) )
@@ -57,7 +58,7 @@ ggplot(data, aes(fill=as.factor(condition), y=value, x=stages)) +
        fill = "Gender") +
   scale_fill_manual(values=c("#1C4E80", "#EA6A47"))
 ```
-
+Percentage of patients by batch 
 ```{r}
 # Compute the position of labels
 data <- count(clinical.data$Batch) %>%
@@ -76,7 +77,7 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   scale_fill_manual(values = c("#7E909A", "#1C4E80", "#A5D8DD", "#EA6A47"), labels=c('Batch 1', 'Batch 2', 'Batch 3', 'Batch 4')) 
 
 ```
-
+Mutations presence across patients
 ```{r}
 # create a dataset
 mutation <- c(rep("KRAS" , 2) , rep("EGFR" , 2) , rep("STK11" , 2))
@@ -97,7 +98,7 @@ ggplot(data, aes(fill=factor(condition), y=value, x=mutation)) +
   scale_fill_manual(values=c("#0091D5", "#EA6A47"))+
   coord_flip()
 ```
-
+Tumor metastatic percentage
 ```{r}
 # Compute the position of labels
 data <- count(clinical.data$Metastatic) %>%
@@ -123,7 +124,7 @@ ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
              x = 0.5,
              y = 2.5)
 ```
-
+Smoking status in patients
 ```{r}
 # Compute the position of labels
 data <- count(clinical.data$Smoking_Status) %>%
@@ -141,7 +142,7 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
        fill = "Smoking Status") +
   scale_fill_manual(values = c("#EA6A47", "#1C4E80", "#A5D8DD"), breaks = c('Old', 'No', 'Yes'), labels=c('Old', 'Never', 'Current')) 
 ```
-
+Age Bracket proportion 
 ```{r}
 # Compute the position of labels
 data <- count(clinical.data$Age_Bracket) %>%
@@ -167,13 +168,14 @@ ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
              x = 0.5,
              y = 2.5)
 ```
-
+Load raw clinical data
 ```{r}
 clinical.data2 <- read.csv("~/LungPredict1/RawFiles/clinic_data_v2_clean.csv", row.names=1)
 clinical.data2$puncture_location[which(clinical.data2$puncture_location=="Extra-thoracique")] = "extra-thoracique"
 clinical.data2$puncture_location[which(clinical.data2$puncture_location=="")] = "NA"
 ```
 
+Patients diagnostic
 ```{r}
 # Compute the position of labels
 data <- count(clinical.data2$diagnostic) %>%
@@ -197,9 +199,8 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
 
 
 ```
-
+Check spelling in raw clinical data
 ```{r}
-
 coldata = clinical.data2[rownames(clinical.data2)%in%rownames(clinical.data),]
 coldata$puncture_location[which(coldata$puncture_location=="extra-thoracique")] = "Extra-thoracique"
 coldata$puncture_location[which(coldata$puncture_location=="Poumon")] = "Lung"
@@ -207,6 +208,7 @@ coldata$type_of_puncture[which(coldata$type_of_puncture=="primaire")] = "Primary
 coldata$type_of_puncture[which(coldata$type_of_puncture=="métastase")] = "Metastasis"
 ```
 
+Puncture location 
 ```{r}
 # Compute the position of labels
 data <- count(coldata$puncture_location) %>%
@@ -227,7 +229,7 @@ ggplot(data, aes(fill=factor(x), y=freq, x=x)) +
   coord_flip()
 
 ```
-
+Type of puncture 
 ```{r}
 # Compute the position of labels
 data <- count(coldata$type_of_puncture) %>%
@@ -246,11 +248,6 @@ ggplot(data, aes(fill=factor(x), y=freq, x=x)) +
        fill = "Type of puncture") +
   scale_fill_manual(values=c("#1C4E80", "#EA6A47"),breaks = c('Primary', 'Metastasis'))+
   coord_flip()
-```
-
-```{r}
-coldata = clinical.data2[which(rownames(clinical.data2)%in%rownames(clinical.data)),]
-coldata = coldata[coldata$diagnostic=="Adénocarcinome",]
 ```
 
 

@@ -1,0 +1,286 @@
+---
+title: "Analysis Early Stage"
+author: "Marcelo Hurtado"
+date: "2023-06-12"
+output: html_document
+---
+
+Load packages and functions
+```{r}
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
+```
+
+Load algorithm for subgrouping
+```{r}
+source(paste0(getwd(),"/Algorithm_subgrouping.R"))
+```
+
+Load input data
+```{r}
+deconv <- as.matrix(read.delim("~/LungPredict1/Input/Deconvolution/Deconvolution_LPVan_Early.txt", row.names=1))
+clinical.data = read.csv("~/LungPredict1/Input/ClinicalData/ClinicalData_LPVan_Early.csv", row.names=1)
+clinical.data = clinical.data[-which(clinical.data$Batch==6),]
+deconv = deconv[rownames(deconv)%in%rownames(clinical.data),]
+```
+
+Cleaning deconvolution results 
+```{r}
+#Removing MCP 
+deconv <- deconv[,-grep("MCP", colnames(deconv))]
+#Removing CD226
+deconv <- deconv[,-grep("CD226", colnames(deconv))]
+```
+
+Unsupervised filtering 
+```{r}
+#Remove columns with low variance (no much change across samples)
+deconv = data.frame(deconv[,-which(colVars(deconv)<=summary(colVars(deconv))[2])])
+#Remove columns with more than 70% of zeros
+i <- colSums(deconv == 0, na.rm=TRUE) < round(0.7*nrow(deconv))
+deconv <- data.frame(deconv[, i, drop=FALSE])
+```
+
+Split by cell types
+```{r}
+cells = compute_cell.types(data.frame(deconv))
+```
+
+Pairwise correlation filtering
+```{r}
+for (i in 1:length(cells)) {
+  data = cells[[i]]
+  if(ncol(data)>1){
+    data = removeCorrelatedFeatures(data)
+    cells[[i]] = data
+  }
+}
+```
+
+Subgrouping deconvolution 
+```{r}
+res = list()
+groups = list()
+groups_similarity = list()
+for (i in 1:length(cells)) {
+  x = compute_subgroups(cells[[i]], names(cells)[i])
+  res = c(res, x[1])
+  groups = c(groups, x[2])
+  groups_similarity = c(groups_similarity, x[4])
+}
+names_cells = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", "CD8", "TREGS", "DENDRITIC", "DENDRITIC.ACTIVATED", "DENDRITIC.RESTING", "CANCER", "ENDOTHELIAL", "CAF")
+names(res) = names_cells
+names(groups) = names_cells
+names(groups_similarity) = names_cells
+
+#Res and Groups 
+ls = remove_subgroups(groups)
+for (i in 1:length(groups)) {
+  idx = which(names(groups[[i]])%in%ls)
+  idy = which(names(res[[i]])%in%ls)
+  if(length(idx)>0){
+    groups[[i]] = groups[[i]][-idx] 
+    res[[i]] = res[[i]][-idy] 
+  }
+}
+```
+
+Output deconvolution
+```{r}
+dt = c()
+for (i in 1:length(res)) {
+  dt = c(dt, res[[i]])
+}
+dt = data.frame(dt)
+rownames(dt) = rownames(deconv)
+
+saveRDS(res, paste0(getwd(), "/Output/EarlyStage/Groups_cells_all_EARLYSTAGE.rds"))
+saveRDS(groups, paste0(getwd(), "/Output/EarlyStage/Groups_cells_correlation_EARLYSTAGE.rds"))
+saveRDS(groups_similarity, paste0(getwd(), "/Output/EarlyStage/Groups_cells_similarity_EARLYSTAGE.rds"))
+write.csv(dt, paste0(getwd(), "/Output/EarlyStage/Deconvolution_after_EARLYSTAGE.csv"))
+```
+
+TRANSCRIPTION FACTOR ANALYSIS FOR DECONVOLUTION
+
+Input data
+```{r}
+dataset = "LPVan_Early"
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/TFs_scores_all_", dataset, ".csv"), row.names = 1)
+```
+
+TFs filtering
+```{r}
+#Remove columns with low variance (no much change across samples)
+TFs = data.frame(TFs[-which(rowVars(TFs)<=summary(rowVars(TFs))[2]),])
+minAbsValue <- abs(min(TFs))
+TFs = TFs + minAbsValue
+```
+
+Finding modules of TFs
+```{r}
+hc <- as.dendrogram(hclust(dist(t(scale(t(TFs)))), method = "ward.D2"))
+png(paste0(getwd(),"/Figures/EarlyStage/TFs_clusters_EARLYSTAGE.png"), width = 7500, height = 4500, res=250)
+plot(hc)
+rect.dendrogram(hc, h = 20,horiz=F)
+dev.off()
+clusters <- cutree(hc, h = 20)
+```
+
+TFs clustering merging
+```{r}
+TFs_modules = TFs %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+
+hc <- as.dendrogram(hclust(dist(t(scale(t(TFs_modules)))), method = "ward.D2"))
+plot(hc)
+rect.dendrogram(hc, h = 10,horiz=F)
+clusters2 <- cutree(hc, h = 10)
+
+TFs_modules_merge = TFs_modules %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters2)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+
+write.csv(TFs_modules_merge, paste0(getwd(), "/Output/EarlyStage/TFs_modules_EARLYSTAGE.csv"))
+```
+
+Correlation between deconvolution and TFs activity across patients
+```{r}
+nSamples = ncol(TFs_modules_merge)
+TFs_modules_merge = TFs_modules_merge[,colnames(TFs_modules_merge)%in%rownames(clinical.data)]
+moduleTraitCor = cor(t(TFs_modules_merge), dt, use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
+
+textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
+                  signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+  
+idx = which(moduleTraitPvalue>0.05)
+for (i in idx) {
+  textMatrix[i] = NA
+}
+
+d <- dist(t(moduleTraitCor), method = "euclidean")
+hc1 <- hclust(d, method = "ward.D2" )
+vec = hc1[["order"]]
+  
+# ###Figure module-trait relationship
+png(paste0(getwd(),"/Figures/EarlyStage/Module_trait_relationships_EARLYSTAGE.png"), width = 4000, height = 1500, res=150)
+par(mar = c(20, 20, 4, 4)) #bottom, left, top, right
+labeledHeatmap(Matrix = moduleTraitCor[,vec],
+               xLabels = names(dt[,vec]),
+               yLabels = rownames(TFs_modules_merge),
+               ySymbols = rownames(TFs_modules_merge),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix[,vec],
+               setStdMargins = FALSE,
+               cex.text = 0.6,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+```
+
+Groups of cell types based on TF activity 
+```{r}
+hc = as.dendrogram(hc1)
+png(paste0(getwd(),"/Figures/EarlyStage/Dendogram_Subgroups_cells_EARLYSTAGE.png"), width = 2500, height = 2500, res=150)
+par(mar = c(5, 5, 4, 30)) #bottom, left, top, right
+plot(hc, horiz= T)
+rect.dendrogram(hc, h=0.6,horiz=TRUE)
+dev.off()
+
+clusters3 <- cutree(hc, k = 27)
+
+png(paste0(getwd(),"/Figures/EarlyStage/Deconvolution_EARLYSTAGE.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(dt)), cluster_rows = hc, clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
+```
+
+Integration of deconvolution clusters
+```{r}
+deconv_df = dt %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster_", clusters3)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+
+write.csv(t(deconv_df), paste0(getwd(), "/Output/EarlyStage/Deconvolution_Integration_EARLYSTAGE.csv"))
+
+png(paste0(getwd(),"/Figures/EarlyStage/Deconvolution_EARLYSTAGE_NICHES.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(t(deconv_df))), clustering_method_columns = "ward.D2",width = unit(30, "cm"), height = unit(35, "cm"), column_dend_height = unit(5, "cm"), show_heatmap_legend = F)
+dev.off()
+
+#Save cell clusters
+data = dt %>%
+  t() %>%
+  as_tibble() %>%
+  mutate("Cluster" = clusters3) %>%
+  as.data.frame()
+rownames(data) = colnames(dt)
+niches = list()
+for (i in 1:nrow(deconv_df)) {
+  niches[[i]] = rownames(data)[which(data$Cluster==i)]
+}
+
+saveRDS(niches, paste0(getwd(), "/Output/EarlyStage/Cell_groups_EARLYSTAGE.rds"))
+```
+
+Patients clustering from LP and Vanderbilt
+```{r}
+dataset = "LungPredict"
+colData_LP <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+data = t(deconv_df)
+LP = data[rownames(data)%in%rownames(colData_LP),]
+colData_LP = colData_LP[rownames(colData_LP)%in%rownames(LP),]
+hc1 = as.dendrogram(hclust(dist(scale(LP)), method = "ward.D2"))
+png(paste0(getwd(),"/Figures/EarlyStage/Patients_clusters_EARLYSTAGE.png"), width = 2500, height = 1500, res=150)
+plot(hc1)
+rect.dendrogram(hc1, k=2,horiz=F)
+dev.off()
+clusters <- cutree(hc1, k=2)
+colData_LP$cluster = NULL
+colData_LP$cluster = clusters
+
+res = random_forest(data.frame(LP), colData_LP$cluster, 10)
+
+png(paste0(getwd(),"/Figures/EarlyStage/Clusters_Feature_Importance_EARLYSTAGE.png"), width = 2000, height = 1500, res=250)
+ggplot(res[[2]], aes(x = reorder(rownames(res[[2]]), -Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(x = "Features", y = "Importance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+dev.off()
+
+hclu = hclust(dist(t(scale(res[[1]]))), method = "ward.D2")
+vec = hclu[["order"]]
+
+png(paste0(getwd(),"/Figures/EarlyStage/Deconvolution_EARLYSTAGE_FS_CLUSTERS.png"), width = 6000, height = 4500, res=250)
+ha <- HeatmapAnnotation(Cluster = colData_LP$cluster, col = list(Cluster = c("1" = "green", "2" = "purple")))
+Heatmap(t(scale(res[[1]][,vec])), cluster_rows = F,  clustering_method_columns = "ward.D2", top_annotation = ha, width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
+
+Vanderbilt validation
+```{r}
+dataset = "Vanderbilt"
+data = t(deconv_df)
+colData_Van <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
+Van = data[rownames(data)%in%rownames(colData_Van),]
+Van = Van[,colnames(Van)%in%colnames(res[[1]])]
+colData_Van = colData_Van[rownames(colData_Van)%in%rownames(Van),]
+
+names = colnames(res[[1]][,vec])
+
+png(paste0(getwd(),"/Figures/EarlyStage/Deconvolution_EARLYSTAGE_VANDERBILT.png"), width = 6000, height = 4500, res=250)
+Heatmap(t(scale(Van[, names])), cluster_rows = F,  clustering_method_columns = "ward.D2", width = unit(30, "cm"), height = unit(20, "cm"), column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"))
+dev.off()
+```
+

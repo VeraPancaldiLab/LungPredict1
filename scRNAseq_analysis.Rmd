@@ -5,18 +5,10 @@ date: "2023-07-10"
 output: html_document
 ---
 
+Load packages and functions
 ```{r}
-library(Seurat)
-library(SeuratDisk)
-library(decoupleR)
-library(dplyr)
-library(tibble)
-library(tidyr)
-library(patchwork)
-library(ggplot2)
-library(pheatmap)
-library(OmnipathR)
-library(SingleR)
+source(paste0(getwd(),"/environment_set.R"))
+libraries_set()
 ```
 
 Load seurat object 
@@ -36,7 +28,7 @@ coldata = clinical.data[clinical.data$pt_ID%in%levels(seurat_anndata@meta.data$s
 #"R3388_YZ_1"  "R3388_YZ_2"  "R3388_YZ_10" "R3388_YZ_11" "R3388_YZ_18" "R3388_YZ_28" "R3388_YZ_56" "R4163_YZ_16" "R4163_YZ_25"
 ```
 
-Identify clusters 
+Cluster identification
 ```{r}
 DimPlot(seurat_anndata, reduction="umap")
 ElbowPlot(seurat_anndata) #determine dimensionality of data
@@ -59,19 +51,11 @@ plotScoreHeatmap(pred)
 plotDeltaDistribution(pred)
 tab = table(Assigned = pred$labels, Clusters = seurat_anndata$seurat_clusters)
 pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
+Idents(seurat_anndata) = seurat_anndata@meta.data$singleR.labels #Rename clusters
 ```
-
-```{r}
-Idents(seurat_anndata) = seurat_anndata@meta.data$singleR.labels
-cells = subset(seurat_anndata, idents = c('NK_cell', 'B_cell', 'DC', 'Endothelial_cells', 'Macrophage', 'Monocyte', 'Neutrophils', 'T_cells', 'Fibroblasts', 'Epithelial_cells'), invert = FALSE)
-saveRDS(cells, "cells.rds")
-```
-
-Find markers for NK cells (NK cluster vs all others)
 
 Extract NK cluster for further analysis
 ```{r}
-NK = subset(seurat_anndata, idents = c(8,2,6), invert = FALSE)
 DimPlot(NK, reduction="umap")
 ElbowPlot(NK) #determine dimensionality of data
 NK<- FindNeighbors(NK, dims = 1:20)
@@ -80,6 +64,7 @@ NK<- RunUMAP(NK, dims = 1:20)
 DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) + 
   NoLegend() + ggtitle('NK cells')
 ```
+
 Extract macrophages cluster for further analysis
 ```{r}
 macrophages = subset(seurat_anndata, idents = 12, invert = FALSE)
@@ -92,20 +77,17 @@ DimPlot(macrophages, reduction="umap", label = T, pt.size = 0.5) +
   NoLegend() + ggtitle('Macrophages cells')
 ```
 
+Classify subclusters NK and macrophages
 ```{r}
 Idents(NK) 
 new.cluster.ids <- c("Cluster1", "Cluster2", "Cluster3")
 names(new.cluster.ids) <- levels(NK)
 NK <- RenameIdents(NK, new.cluster.ids)
 
-
 Idents(macrophages) 
 new.cluster.ids <- c("Cluster1", "Cluster2", "Cluster3")
 names(new.cluster.ids) <- levels(macrophages)
 macrophages <- RenameIdents(macrophages, new.cluster.ids)
-
-saveRDS(NK, "nk2.rds")
-saveRDS(macrophages, "macrophages.rds")
 ```
 
 Find all markers across the different NK subclusters
@@ -136,6 +118,8 @@ FeaturePlot(NK, features = features, ncol = 3)
 VlnPlot(NK, features = features, ncol = 3)
 RidgePlot(NK, features = features, ncol = 3)
 ```
+
+########################################################################
 
 TFs inference from single cell data 
 
@@ -200,24 +184,15 @@ DefaultAssay(object = NK) <- "tfsulm"
 # Scale the data
 NK <- ScaleData(NK)
 NK@assays$tfsulm@data <- NK@assays$tfsulm@scale.data
-saveRDS(NK, "nk2.rds")
+```
 
-#==================================================================================================
-
-# Extract ulm and store it in tfsulm in pbmc
-macrophages[['tfsulm']] <- acts %>%
-  pivot_wider(id_cols = 'source', names_from = 'condition',
-              values_from = 'score') %>%
-  column_to_rownames('source') %>%
-  Seurat::CreateAssayObject(.)
-
-# Change assay
-DefaultAssay(object = macrophages) <- "tfsulm"
-
-# Scale the data
-macrophages <- ScaleData(macrophages)
-macrophages@assays$tfsulm@data <- macrophages@assays$tfsulm@scale.data
-saveRDS(macrophages, "macrophages.rds")
+Clustering using protein activity
+```{r}
+NK<- FindNeighbors(NK, dims = 1:10)
+NK<- FindClusters(NK, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
+NK<- RunUMAP(NK, dims = 1:10)
+DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) + 
+  NoLegend() + ggtitle('NK cells')
 ```
 
 Find all TFs markers of NK subclusters
@@ -239,15 +214,6 @@ RidgePlot(NK, features = features, ncol = 2)
 VlnPlot(NK, features = features, ncol = 2)
 (FeaturePlot(NK, features = features, ncol = 2)& 
   scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
-```
-
-Clustering using protein activity
-```{r}
-NK<- FindNeighbors(NK, dims = 1:10)
-NK<- FindClusters(NK, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
-NK<- RunUMAP(NK, dims = 1:10)
-DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) + 
-  NoLegend() + ggtitle('NK cells')
 ```
 
 Differential TFs across cluster 0 vs 1 NK
@@ -276,57 +242,13 @@ DefaultAssay(object = NK) <- "tfsulm"
 p1 | p2 | p3
 ```
 
-Top 30 variable TFs across NK clusters
-```{r}
-n_tfs <- 30
-# Extract activities from object as a long dataframe
-df <- t(as.matrix(NK@assays$tfsulm@data)) %>%
-  as.data.frame() %>%
-  mutate(cluster = Idents(NK)) %>%
-  pivot_longer(cols = -cluster, names_to = "source", values_to = "score") %>%
-  group_by(cluster, source) %>%
-  summarise(mean = mean(score))
-
-# Get top tfs with more variable means across clusters
-tfs <- df %>%
-  group_by(source) %>%
-  summarise(std = sd(mean)) %>%
-  arrange(-abs(std)) %>%
-  head(n_tfs) %>%
-  pull(source)
-
-# Subset long data frame to top tfs and transform to wide matrix
-top_acts_mat <- df %>%
-  filter(source %in% tfs) %>%
-  pivot_wider(id_cols = 'cluster', names_from = 'source',
-              values_from = 'mean') %>%
-  column_to_rownames('cluster') %>%
-  as.matrix()
-
-# Plot
-pheatmap(top_acts_mat, border_color = NA) 
-```
-
 Features plot of TFs found in bulk analysis
 ```{r}
 (FeaturePlot(NK, features = c("TBX21","PAX5", "LYL1", "HIF1A", "CXXC4")) & 
   scale_colour_gradient2(low = 'blue', mid = 'white', high = 'red'))
 ```
 
-Re-clustering using only subset of patients with bulk
-```{r}
-nk2 = subset(NK, subset = Clusters_bulk == cell_values)
-
-ElbowPlot(nk2) #determine dimensionality of data
-nk2<- FindNeighbors(nk2, dims = 1:15)
-nk2<- FindClusters(nk2, algorithm= 1, resolution = 0.15, verbose = T, graph.name = "RNA_snn")
-nk2<- RunUMAP(nk2, dims = 1:10)
-DimPlot(nk2, reduction="umap", label = T, pt.size = 0.5) + 
-  NoLegend() + ggtitle('NK cells')
-DimPlot(nk2, reduction="umap", group.by = 'Clusters_bulk') + 
-  ggtitle('Samples from bulk')
-```
-
+Save ouput file
 ```{r}
 saveRDS(NK, "nk.rds")
 ```

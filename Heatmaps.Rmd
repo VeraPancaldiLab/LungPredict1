@@ -1,5 +1,5 @@
 ---
-title: "Heatmap_annotations"
+title: "Heatmaps_figures"
 author: "Marcelo Hurtado"
 date: '2023-01-14'
 output: html_document
@@ -14,74 +14,30 @@ libraries_set()
 Datasets
 ```{r}
 dataset = "LungPredict"
-dataset = "VanIP"
 dataset = "Vanderbilt"
 dataset = "Response"
-dataset = "Melanoma"
-dataset = "Immucan"
-dataset = "TCGA"
-dataset = "Liu"
-dataset = "LPVan"
+dataset = "LPVan_Early"
 ```
 
-Input annotations
+Input data
 ```{r}
 clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
-deconv <- read.csv(paste0(getwd(),"/Output/Deconvolution/Deconvolution_afterFS_", dataset, ".txt"), row.names = 1)
+deconv <- read.csv(paste0(getwd(),"/Output/EarlyStage/Deconvolution_afterFS_EarlyStage.csv"), row.names = 1)
 pathways <- read.csv(paste0(getwd(),"/Output/Pathways/Pathways_Progeny_", dataset, ".csv"), row.names = 1)
 immunescores <- read.csv(paste0(getwd(),"/Output/Immunoscores/ImmuneScores_", dataset, ".csv"), row.names = 1)
-TFs <- read.csv(paste0(getwd(),"/Output/TFs/VIPER/TFs_scores_all_", dataset, ".csv"), row.names = 1)
-integration <- read.csv(paste0(getwd(), "/Output/DataIntegration/Features_integrated_", dataset,".csv"), row.names=1)
+TFs <- read.csv(paste0(getwd(),"/Output/TFs/TFs_scores_all_", dataset, ".csv"), row.names = 1)
+integration <- read.csv(paste0(getwd(), "/Output/DataIntegration/Deconvolution_Integration_EARLYSTAGE.csv"), row.names=1)
 ```
 
 Setting for plotting
 ```{r}
-#Join clinical data with immunoscores
 immunescores = minMax(immunescores)
 clinical.data = cbind(clinical.data, immunescores)
-
 ha = heatmap_annotation(clinical.data)
-```
-
-Integration
-```{r}
-clinical.data$stag = "Early"
-clinical.data$stag[which(clinical.data$Stages_simplified%in%"IV")] = "Late Stage"
-
-vec = which(clinical.data$stag=="Late Stage")
-clinical.data = clinical.data[-vec,]
-integration = integration[,-vec]
-
-dend_column = as.dendrogram(hclust(dist(scale(t(integration[,1:ncol(integration)-1]))), method = "ward.D2"))
-png(paste0(getwd(),"/Figures/Dendogram_patients_", dataset, ".png"), width = 3500, height = 1500, res=150)
-plot(dend_column)
-rect.dendrogram(dend_column, h=15,horiz=F)
-dev.off()
-clusters <- cutree(dend_column, k=2)
-clinical.data$cluster = clusters
-
-ht1 = Heatmap(t(scale(t(integration[,1:ncol(integration)-1]))), 
-        border = T, 
-        top_annotation = ha,  clustering_distance_columns = "euclidean",
-        name = "Deconvolution", clustering_method_rows = "ward.D2", clustering_method_columns = "ward.D2",
-        column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"), 
-        column_dend_reorder = T, row_dend_reorder = F,
-        show_row_names = T, 
-        show_heatmap_legend = T, 
-        row_names_gp = gpar(fontsize = 14), 
-        column_names_gp = gpar(fontsize =12), 
-        width = unit(30, "cm"), height = unit(10, "cm"),
-        heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
-                                    legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
-
-png(paste0(getwd(),"/Figures/test", dataset, ".png"), width = 7000, height = 4000, res=250)
-draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
-dev.off()
 ```
 
 Deconvolution
 ```{r}
-#dend_column = as.dendrogram(hclust(dist(deconv), method = "ward.D2"))
 dend_row = hc
 ht1 = Heatmap(t(scale(deconv)), 
         border = T,
@@ -99,40 +55,14 @@ ht1 = Heatmap(t(scale(deconv)),
         heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
                                     legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
 
-png(paste0(getwd(),"/Figures/Heatmaps/Deconvolution_", dataset, ".png"), width = 7500, height = 5000, res=250)
-draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
-dev.off()
-```
-
-Progeny pathways 
-```{r}
-col_fun = colorRamp2(c(-4, 0, 4), c("blue", "white", "orange"))
-
-dend_column = as.dendrogram(hclust(dist(pathways), method = "ward.D2"))
-
-ht1 = Heatmap(t(scale(pathways)), border = T,
-        top_annotation = ha, col = col_fun,
-        cluster_columns = dend_column, column_gap = unit(8, "mm"),
-        name = "Pathways score", clustering_method_rows = "ward.D2", clustering_method_columns = "ward.D2",
-        column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"), 
-        row_dend_reorder = F, column_dend_reorder = T, 
-        show_row_names = T, 
-        show_heatmap_legend = T, 
-        row_names_gp = gpar(fontsize = 12),
-        column_names_gp = gpar(fontsize =12),
-        width = unit(30, "cm"), height = unit(20, "cm"),
-        heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
-                                    legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
-
-png(paste0(getwd(),"/Figures/Heatmaps/Pathways_Progeny_", dataset, ".png"), width = 6000, height = 4000, res=250)
+png(paste0(getwd(),"/Figures/EarlyStage/Deconvolution_", dataset, ".png"), width = 7500, height = 5000, res=250)
 draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
 dev.off()
 ```
 
 TFs scores  
 ```{r}
-TFs_top = remove_high_corr(TFs) 
-TFs_top = TFs_top[order(rowMeans(TFs_top), decreasing=TRUE)[1:50],]
+TFs_top = TFs_top[order(rowVars(TFs_top), decreasing=TRUE)[1:50],]
 col_fun = colorRamp2(c(-4, 0, 4), c("green", "white", "red"))
 
 dend_column = as.dendrogram(hclust(dist(t(TFs_top)), method = "ward.D2"))
@@ -151,19 +81,13 @@ ht1 = Heatmap(t(scale(t(TFs_top))),
         heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
                                     legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
 
-png(paste0(getwd(),"/Figures/Heatmaps/TFs_all_", dataset, ".png"), width = 6000, height = 5000, res=250)
+png(paste0(getwd(),"/Figures/EarlyStage/TFs_all_", dataset, ".png"), width = 6000, height = 5000, res=250)
 draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
 dev.off()
 ```
 
-
 Integration
 ```{r}
-cluster_no = c("Cluster.5", "Cluster.7") #LungPredict
-cluster_no = c("Cluster.13") #VanIP
-
-integration = integration[1:nrow(integration)-1,-which(colnames(integration)%in%cluster_no)]
-
 dend_column = as.dendrogram(hclust(dist(integration), method = "ward.D2"))
 
 ht1 = Heatmap(t(scale(integration)), 
@@ -181,41 +105,7 @@ ht1 = Heatmap(t(scale(integration)),
         heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
                                     legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
 
-png(paste0(getwd(),"/Figures/Heatmaps/Deconvolution_Features", dataset, ".png"), width = 6000, height = 4000, res=250)
-draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
-dev.off()
-```
-
-Response
-```{r}
-ha <- HeatmapAnnotation(Response = clinical.data$Response, 
-                        col = list(Response = c("Responders" = "green", "Non responders" = "red", "No data" = "white")),
-                        annotation_legend_param = list(labels_gp = gpar(fontsize = 10), legend_width = unit(12, "cm"), 
-                                legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
-  
-cluster_no = c("Cluster.1","Cluster.15") #Response
-cluster_no = c("Cluster.2","Cluster.8", "Cluster.13") #Gide
-
-RESPONSE = RESPONSE[,-which(colnames(RESPONSE)%in%cluster_no)]
-
-dend_column = as.dendrogram(hclust(dist(RESPONSE[1:nrow(RESPONSE)-1,]), method = "ward.D2"))
-
-ht1 = Heatmap(t(scale(RESPONSE[1:nrow(RESPONSE)-1,])), 
-        border = T,
-        top_annotation = ha, 
-        cluster_columns = dend_column, column_gap = unit(8, "mm"),
-        name = "Deconvolution", clustering_method_rows = "ward.D2", clustering_method_columns = "ward.D2",
-        column_dend_height = unit(10, "cm"), row_dend_width = unit(10, "cm"), 
-        column_dend_reorder = T, row_dend_reorder = F,
-        show_row_names = T, 
-        show_heatmap_legend = T, 
-        row_names_gp = gpar(fontsize = 16), 
-        column_names_gp = gpar(fontsize =12), 
-        width = unit(30, "cm"), height = unit(20, "cm"),
-        heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
-                                    legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
-
-png(paste0(getwd(),"/Figures/Heatmaps/Deconvolution_Features", dataset, ".png"), width = 7000, height = 5000, res=250)
+png(paste0(getwd(),"/Figures/EarlyStage/Deconvolution_Features", dataset, ".png"), width = 6000, height = 4000, res=250)
 draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
 dev.off()
 ```

@@ -14,18 +14,13 @@ libraries_set()
 Datasets
 ```{r}
 dataset = "LungPredict"
-dataset = "VanIP"
 dataset = "Vanderbilt"
-dataset = "Response"
-dataset = "Melanoma"
-dataset = "Immucan"
-dataset = "TCGA"
-dataset = "LPVan"
+dataset = "LPVan_Early"
 ```
 
 Input files
 ```{r}
-CountsLP <- read.csv(paste0(getwd(),"/Input/Counts/Counts_", dataset, ".csv"), row.names = 1)
+Counts <- read.csv(paste0(getwd(),"/Input/Counts/Counts_", dataset, ".csv"), row.names = 1)
 clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
 ```
 
@@ -46,21 +41,10 @@ dds <- estimateSizeFactors(dds)
 saveRDS(dds, paste0(getwd(),"/Output/DESeqObject_", dataset))
 ```
 
-Melanoma
-```{r}
-dds = readRDS(paste0(getwd(),"/Input/Matthieu/Liu/processed/dds.RDS"), refhook = NULL)
-```
-
 Data normalization
 ```{r}
 dds <- estimateSizeFactors(dds)
 vsd <- vst(dds)
-```
-
-Melanoma (Liu)
-```{r}
-dataset = "Liu"
-write.csv(assay(vsd), paste0(getwd(),"/Output/Counts_normalized_", dataset, ".csv"))
 ```
 
 Batch effect removal
@@ -69,7 +53,6 @@ Batch effect removal
 PCAall = plotPCA(vsd, intgroup=c("Batch", "Gender","Stages_simplified", "Smoking_Status", "Age_Bracket"), returnData = TRUE)
 pca.var = round(100*attr(PCAall, "percentVar"))
 
-png(paste0(getwd(),"/Figures/Batch/Batch_effect_", dataset), width = 2500, height = 2000, res=250)
 ggplot(data = PCAall, aes(x = PC1, y = PC2, color = Batch))+
   geom_hline(yintercept = 0, lty = 2) +
   geom_vline(xintercept = 0, lty = 2) +
@@ -78,7 +61,6 @@ ggplot(data = PCAall, aes(x = PC1, y = PC2, color = Batch))+
   ylab(paste("PC2 - ", pca.var[2], "%", sep=""))+
   ggtitle(paste0("Batch effect - ",dataset), subtitle = paste(nrow(clinical.data)," Adenocarcinoma samples")) +
   coord_fixed() 
-dev.off()
 
 #After batch effect removal
 assay(vsd) <- limma::removeBatchEffect(assay(vsd), batch=vsd$Batch)
@@ -86,7 +68,6 @@ assay(vsd) <- limma::removeBatchEffect(assay(vsd), batch=vsd$Batch)
 PCAall = plotPCA(vsd, intgroup=c("Batch", "Gender","Stages_simplified", "Smoking_Status", "Age_Bracket"), returnData = TRUE)
 pca.var = round(100*attr(PCAall, "percentVar"))
 
-png(paste0(getwd(),"/Figures/Batch/After_BE_removal_", dataset), width = 2500, height = 2000, res=250)
 ggplot(data = PCAall, aes(x = PC1, y = PC2, color = Batch))+
   geom_hline(yintercept = 0, lty = 2) +
   geom_vline(xintercept = 0, lty = 2) +
@@ -95,10 +76,9 @@ ggplot(data = PCAall, aes(x = PC1, y = PC2, color = Batch))+
   ylab(paste("PC2 - ", pca.var[2], "%", sep=""))+
   ggtitle(paste0("After BE removal - ",dataset), subtitle = paste(nrow(clinical.data)," Adenocarcinoma samples")) +
   coord_fixed() 
-dev.off()
 ```
 
 Save files
 ```{r}
-write.csv(assay(vsd), paste0(getwd(),"/Output/Counts_normalized_", dataset, ".csv"))
+write.csv(assay(vsd), paste0(getwd(),"/Output/Counts_normalized_vsd_", dataset, ".csv"))
 ```

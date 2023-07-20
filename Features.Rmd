@@ -1,5 +1,5 @@
 ---
-title: "Figures"
+title: "Features analysis"
 author: "Marcelo Hurtado"
 date: "2023-01-13"
 output: html_document
@@ -8,25 +8,21 @@ output: html_document
 Load packages and functions
 ```{r}
 source(paste0(getwd(),"/environment_set.R"))
+source(paste0(getwd(),"/Immunoscores.R"))
 libraries_set()
 ```
 
 Datasets
 ```{r}
 dataset = "LungPredict"
-dataset = "VanIP"
 dataset = "Vanderbilt"
 dataset = "Response"
-dataset = "Melanoma"
-dataset = "Immucan"
-dataset = "TCGA"
-dataset = "Liu"
-dataset = "LPVan"
+dataset = "LPVan_Early"
 ```
 
 Input files
 ```{r}
-Counts_normalized <- as.matrix(read.csv(paste0(getwd(),"/Output/Counts_normalized_", dataset, ".csv"), row.names = 1))
+Counts_normalized <- as.matrix(read.csv(paste0(getwd(),"/Output/Counts_normalized_vsd_", dataset, ".csv"), row.names = 1))
 clinical.data <- read.csv(paste0(getwd(),"/Input/ClinicalData/ClinicalData_", dataset, ".csv"), row.names = 1)
 dds = readRDS(paste0(getwd(), "/Output/DESeqObject_", dataset))
 ```
@@ -43,7 +39,6 @@ diff_expression(dds, "VISTArank", "HIGH", "LOW", "LungPredict_VISTA_HIGHvsLOW")
 
 Converting gene ID to SYMBOL (if needed)
 ```{r}
-Counts_normalized = CountsLP
 m2 <- do.call(rbind, strsplit(rownames(Counts_normalized), split="_", fixed = TRUE))
 Counts_normalized = as.matrix(Counts_normalized)
 rownames(Counts_normalized) = m2[,2]
