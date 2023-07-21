@@ -12,6 +12,8 @@ Bulk RNASeq data from NSCLC patients
 - ImmunoPredict dataset: 19 patients NSCLC (Adenocarcinoma) - Late Stage
 - Vanderbilt Single-cell RNAseq data: 15 patients NSCL (Adenocarcinoma) - Early Stage
 
+![/Figures/](Summary.png)
+
 ## Project organization
 - Scripts: Codes used to develop the project's methods 
 - Figures: Images results from analysis in Early and Late Stage patients
