@@ -1,4 +1,4 @@
 # ignore ALL files in ANY directory named temp
-LungPredict1/Input/
-LungPredict1/RawFiles/
-LungPredict1/IHC/ 
+/home/marcelo/LungPredict1/Input/
+/home/marcelo/LungPredict1/RawFiles/
+/home/marcelo/LungPredict1/IHC/ 
