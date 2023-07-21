@@ -18,7 +18,7 @@ Bulk RNASeq data from NSCLC patients
 - Scripts: Codes used to develop the project's methods 
 - Figures: Images results from analysis in Early and Late Stage patients
 - Output: Result files from analysis in Early and Late Stage patients
-- 
+  
 ## Methodology
 Analysis was divided in two parts for Early (Stage I, II) and Late Stage (Stage IV) patients. Some of the methods used:
 - Unsupervised and supervised analysis
