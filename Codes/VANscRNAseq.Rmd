@@ -1,0 +1,516 @@
+---
+title: "VAN_scRNAseq"
+author: "LFK"
+date: "2023-06-26"
+output: html_document
+---
+
+```{r libraries}
+remotes::install_version("Seurat", version = "4.3.0")
+remotes::install_github("mojaveazure/seurat-disk")
+remotes::install_version("Matrix", version = "1.5.3")
+install.packages("Matrix", repos = "http://cran.r-project.org")
+library(Matrix)
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(SeuratDisk)
+library(SingleR)
+library(celldex)
+```
+
+
+```{r load data}
+# Convert("all_samples.h5ad", dest = "h5seurat", overwrite = T)
+
+VANscTest = LoadH5Seurat("all_samples.h5seurat", assays = "RNA" )
+VANscTest
+
+# ColDATA = data.frame(read.csv("ColumnData_Vanderbilt.csv", row.names = 1))
+# head(ColDATA)
+# rownames(ColDATA)
+
+levels(VANscTest@meta.data$sample)
+
+
+```
+
+```{r QC}
+# VANscTest <- FindVariableFeatures(VANscTest, selection.method = "vst", nfeatures = 2000)
+# 
+# # Identify the 10 most highly variable genes
+# top10 <- head(VariableFeatures(VANscTest), 10)
+# top10
+# # plot variable features with and without labels
+# plot1 <- VariableFeaturePlot(VANscTest)
+# plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+# plot1 + plot2
+```
+
+```{r scale Data}
+# all.genes <- rownames(VANscTest)
+# VANscTest <- ScaleData(VANscTest, features = all.genes)
+```
+
+```{r PCA}
+# VANscTest <- RunPCA(VANscTest, features = VariableFeatures(object = VANscTest))
+# 
+# print(VANscTest[["pca"]], dims = 1:5, nfeatures = 5)
+# 
+# VizDimLoadings(VANscTest, dims = 1:2, reduction = "pca")
+
+DimPlot(VANscTest, reduction = "pca")
+DimPlot(VANscTest, reduction = "umap")
+# DimPlot(VANscTest, reduction = "tsne")
+
+DimHeatmap(VANscTest, dims = 1:5, cells = 500, balanced = TRUE)
+
+ElbowPlot(VANscTest)
+
+pdf("ALL_elbowPlot.pdf")
+ElbowPlot(VANscTest)
+dev.off()
+
+```
+
+```{r cluster cells}
+VANscTest <- FindNeighbors(VANscTest, dims = 1:20)
+VANscTest <- FindClusters(VANscTest, resolution = 1)
+
+# head(Idents(VANscTest), 5)
+
+```
+
+
+```{r umap}
+VANscTest <- RunUMAP(VANscTest, dims = 1:20)
+DimPlot(VANscTest, reduction = "umap", label = T)
+
+pdf("NumberedClusters.pdf")
+DimPlot(VANscTest, reduction = "umap", label = T)
+dev.off()
+```
+
+```{r tsne}
+VANscTest <- RunTSNE(VANscTest, dims = 1:20)
+DimPlot(VANscTest, reduction = "tsne", label = T)
+```
+
+```{r cluster biomarker}
+# find all markers of cluster 0
+cluster2.markers <- FindMarkers(VANscTest, ident.1 = 0, min.pct = 0.25)
+head(cluster2.markers, n = 10)
+
+# find all markers of cluster 1
+cluster2.markers <- FindMarkers(VANscTest, ident.1 = 1, min.pct = 0.25)
+head(cluster2.markers, n = 10)
+
+# find all markers of cluster 2
+cluster2.markers <- FindMarkers(VANscTest, ident.1 = 2, min.pct = 0.25)
+head(cluster2.markers, n = 10)
+
+# find all markers of cluster 3
+cluster2.markers <- FindMarkers(VANscTest, ident.1 = 3, min.pct = 0.25)
+head(cluster2.markers, n = 10)
+
+# find all markers of cluster 4
+cluster2.markers <- FindMarkers(VANscTest, ident.1 = 4, min.pct = 0.25)
+head(cluster2.markers, n = 10)
+
+# find all markers of cluster 8
+cluster2.markers <- FindMarkers(VANscTest, ident.1 = 8, min.pct = 0.25)
+head(cluster2.markers, n = 10)
+
+# find all markers distinguishing cluster 5 from clusters 0 and 3
+cluster5.markers <- FindMarkers(VANscTest, ident.1 = 5, ident.2 = c(0, 3), min.pct = 0.25)
+head(cluster5.markers, n = 5)
+
+# find markers for every cluster compared to all remaining cells, report only the positive ones
+# VANscTest.markers <- FindAllMarkers(VANscTest, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+# VANscTest.markers %>%
+#     group_by(cluster) %>%
+#     slice_max(n = 5, order_by = avg_log2FC)
+
+VANscTest.markersALL <- FindAllMarkers(VANscTest, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0.25)
+head(VANscTest.markersALL)
+
+VANscTest.markersALL %>%
+    group_by(cluster) %>%
+    slice_max(n = 5, order_by = avg_log2FC)
+
+VANscTest.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) -> top10
+DoHeatmap(VANscTest, features = top10$gene) + NoLegend()
+
+DoHeatmap(subset(VANscTest, downsample = 100), features = featuresOI, size = 3)
+DoHeatmap(subset(VANscTest, downsample = 500), features = featuresOI, size = 3)
+```
+
+
+```{r plots}
+VlnPlot(VANscTest, features = c("KLRC2", "KLRC3", "CD226"))
+VlnPlot(VANscTest, features = c("CD226", "NCAM1", "FCGR3A"), log = T, y.max = 1.2)
+VlnPlot(VANscTest, features = c("KLRC2", "KLRC3", "CD226", "CD3E", "CD4", "CD8A"), log = T, y.max = 1.2)
+
+FeaturePlot(VANscTest, features = c("NKG7", "KLRC2", "KLRC3", "CD3E", "CD4", "CD8A", "NCAM1", "FCGR3A", "CD226", "GZMB", "PRF1", "MS4A1", "CD79A", "CD79B", "TNF", "IFNG"))
+
+featuresOI = c("NKG7", "KLRC2", "KLRC3", "CD3E", "CD4", "CD8A", "NCAM1", "FCGR3A", "CD226", "GZMB", "PRF1", "MS4A1", "CD79A", "CD79B", "TNF", "IFNG")
+RidgePlot(VANscTest, features = featuresOI, ncol = 4)
+VlnPlot(VANscTest, features = featuresOI, log = T)
+DotPlot(VANscTest, features = featuresOI) + RotatedAxis()
+
+DoHeatmap(subset(VANscTest, downsample = 100), features = featuresOI, size = 3)
+DoHeatmap(subset(VANscTest, downsample = 500), features = featuresOI, size = 3)
+
+FeaturePlot(VANscTest, features = c("CD226", "FCGR3A"), blend = TRUE, cols = c("lightgrey", "#dd00ff", "#ff9900"))
+
+
+
+featuresNK = c("NCAM1", "FCGR3A", "KLRC2", "KLRC3", "KLRC1", "KLRD1", "CD226", "GZMB", "PRF1", "TIGIT", "CSF1R")
+RidgePlot(VANscTest, features = featuresNK, ncol = 3)
+VlnPlot(VANscTest, features = featuresNK, log = T)
+DotPlot(VANscTest, features = featuresNK) + RotatedAxis()
+
+
+```
+
+```{r annotation}
+
+# options are: HumanPrimaryCellAtlasData(), BlueprintEncodeData(), MouseRNAseqData(), ImmGenData(), DatabaseImmuneCellExpressionData(), NovershternHematopoieticData(), MonacoImmuneData()
+
+ref = celldex::HumanPrimaryCellAtlasData()
+head(ref$label.main)
+
+VANscTest
+
+VANscTest_counts = GetAssayData(VANscTest, slot='counts')
+
+VANautoAnnot = SingleR(test = VANscTest_counts, 
+        ref = ref,
+        labels = ref$label.main)
+
+head(VANautoAnnot)
+VANscTest$HumanPrimaryCellAtlas = VANautoAnnot$labels[match(rownames(VANscTest@meta.data), rownames(VANautoAnnot))]
+DimPlot(VANscTest, reduction = 'umap', group.by = 'HumanPrimaryCellAtlas')
+
+pdf("HPCA_annotatedClusters.pdf")
+DimPlot(VANscTest, reduction = 'umap', group.by = 'HumanPrimaryCellAtlas')
+dev.off()
+```
+
+```{r annotation test}
+refTest = celldex::DatabaseImmuneCellExpressionData()
+head(refTest$label.main)
+
+VANautoAnnotTest = SingleR(test = VANscTest_counts, 
+        ref = refTest,
+        labels = refTest$label.main)
+
+head(VANautoAnnotTest)
+VANscTest$ImmuneCellsExpression = VANautoAnnotTest$labels[match(rownames(VANscTest@meta.data), rownames(VANautoAnnotTest))]
+DimPlot(VANscTest, reduction = 'umap', group.by = 'ImmuneCellsExpression')
+
+pdf("ICEAnnotatedClusters.pdf")
+DimPlot(VANscTest, reduction = 'umap', group.by = 'ImmuneCellsExpression')
+dev.off()
+```
+
+```{r annotation test2}
+refTest2 = celldex::MonacoImmuneData()
+head(refTest2$label.main)
+
+VANautoAnnotTest2 = SingleR(test = VANscTest_counts, 
+        ref = refTest2,
+        labels = refTest2$label.main)
+
+head(VANautoAnnotTest2)
+VANscTest$Monaco = VANautoAnnotTest2$labels[match(rownames(VANscTest@meta.data), rownames(VANautoAnnotTest2))]
+DimPlot(VANscTest, reduction = 'umap', group.by = 'Monaco')
+
+pdf("MonacoAnnotatedCLusters.pdf")
+DimPlot(VANscTest, reduction = 'umap', group.by = 'Monaco')
+dev.off()
+
+```
+
+```{r annotation test3}
+refTest3 = celldex::BlueprintEncodeData()
+head(refTest3$label.main)
+
+VANautoAnnotTest3 = SingleR(test = VANscTest_counts, 
+        ref = refTest3,
+        labels = refTest3$label.main)
+
+head(VANautoAnnotTest3)
+VANscTest$BlueprintEncode = VANautoAnnotTest3$labels[match(rownames(VANscTest@meta.data), rownames(VANautoAnnotTest3))]
+DimPlot(VANscTest, reduction = 'umap', group.by = 'BlueprintEncode')
+
+pdf("BlueprintEncodeAnnotatedCLusters.pdf")
+DimPlot(VANscTest, reduction = 'umap', group.by = 'BlueprintEncode')
+dev.off()
+
+```
+
+```{heatmap human cell atlas}
+# pdf("heatmap_HPCA.pdf")
+plotScoreHeatmap(VANautoAnnot)
+# dev.off()
+```
+
+```{r heatmap immuneCells}
+plotScoreHeatmap(VANautoAnnotTest)
+
+pdf("heatmap_ICA.pdf")
+plotScoreHeatmap(VANautoAnnotTest)
+dev.off()
+```
+
+```{r heatmap Monaco}
+plotScoreHeatmap(VANautoAnnotTest2)
+
+pdf("heatmap_Monaco.pdf")
+plotScoreHeatmap(VANautoAnnotTest2)
+dev.off()
+```
+
+```{r heatmap Encode}
+plotScoreHeatmap(VANautoAnnotTest3)
+
+pdf("heatmap_BlueprintEncode.pdf")
+plotScoreHeatmap(VANautoAnnotTest3)
+dev.off()
+```
+
+```{r annotation table}
+Annottab <- table(Assigned=VANautoAnnot$pruned.labels, Cluster=VANscTest$seurat_clusters)
+
+# Adding a pseudo-count of 10 to avoid strong color jumps with just 1 cell.
+pheatmap(log2(Annottab+10), color=colorRampPalette(c("white", "purple"))(101))
+
+pdf("HPCA_Table.pdf")
+pheatmap(log2(Annottab+10), color=colorRampPalette(c("white", "purple"))(101))
+dev.off()
+```
+
+```{r annotation test table}
+AnnottabTest <- table(Assigned=VANautoAnnotTest$pruned.labels, Cluster=VANscTest$seurat_clusters)
+
+# Adding a pseudo-count of 10 to avoid strong color jumps with just 1 cell.
+pheatmap(log2(AnnottabTest+10), color=colorRampPalette(c("white", "purple"))(101))
+
+pdf("ICA_Table.pdf")
+pheatmap(log2(AnnottabTest+10), color=colorRampPalette(c("white", "purple"))(101))
+dev.off()
+```
+
+```{r annotation test table}
+AnnottabTest2 <- table(Assigned=VANautoAnnotTest2$pruned.labels, Cluster=VANscTest$seurat_clusters)
+
+# Adding a pseudo-count of 10 to avoid strong color jumps with just 1 cell.
+pheatmap(log2(AnnottabTest2+10), color=colorRampPalette(c("white", "purple"))(101))
+
+pdf("Monaco_Table.pdf")
+pheatmap(log2(AnnottabTest2+10), color=colorRampPalette(c("white", "purple"))(101))
+dev.off()
+```
+
+```{r annotation test table}
+AnnottabTest3 <- table(Assigned=VANautoAnnotTest3$pruned.labels, Cluster=VANscTest$seurat_clusters)
+
+# Adding a pseudo-count of 10 to avoid strong color jumps with just 1 cell.
+pheatmap(log2(AnnottabTest3+10), color=colorRampPalette(c("white", "purple"))(101))
+
+pdf("BlueprintEncode_Table.pdf")
+pheatmap(log2(AnnottabTest3+10), color=colorRampPalette(c("white", "purple"))(101))
+dev.off()
+```
+
+```{r focusing on cluster 8 - NK}
+Idents(VANscTest) <- "seurat_clusters" 
+NK8 = subset(VANscTest, idents = "8", invert = FALSE)
+DimPlot(NK8, reduction="umap")
+
+pdf("NK_Cluster8.pdf")
+DimPlot(NK8, reduction="umap")
+dev.off()
+```
+
+
+```{r focusing on cluster 2,6,8 - NK}
+# Idents(VANscTest) <- "seurat_clusters" 
+NK268 = subset(VANscTest, idents = c("2", "6","8"), invert = FALSE)
+DimPlot(NK268, reduction="umap")
+
+pdf("NK268_Cluster.pdf")
+DimPlot(NK268, reduction="umap")
+dev.off()
+```
+
+
+
+```{r elbow plot NK}
+ElbowPlot(NK8)
+ElbowPlot(NK268)
+```
+
+```{r NK subclusters}
+NK8 = FindNeighbors(NK8, dims = 1:20)
+NK8 = FindClusters(NK8, algorithm= 1, resolution = 0.1)
+
+NK268 = FindNeighbors(NK268, dims = 1:20)
+NK268 = FindClusters(NK268, algorithm= 1, resolution = 0.1)
+```
+
+```{r NK8 UMAP}
+NK8 = RunUMAP(NK8, dims = 1:20)
+DimPlot(NK8, reduction = "umap", label = T)
+
+pdf("NKCluster8.pdf")
+DimPlot(NK8, reduction = "umap", label = T)
+dev.off()
+
+```
+
+```{r NK268 UMAP}
+NK268 = RunUMAP(NK268, dims = 1:20)
+DimPlot(NK268, reduction = "umap", label = T)
+
+pdf("NKClusters268.pdf")
+DimPlot(NK268, reduction = "umap", label = T)
+dev.off()
+```
+
+```{r find ALL markers NK8}
+NK8.markersALL <- FindAllMarkers(NK8, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0.25)
+head(NK8.markersALL, 12)
+
+write.csv(NK8.markersALL, "NK8_markerALL.csv")
+```
+
+```{r find markers }
+NK8.markers <- FindMarkers(NK8, ident.1 = "0", ident.2 = "1")
+head(NK8.markers, 12)
+
+```
+
+```{r find ALL markers NK268}
+NK268.markersALL <- FindAllMarkers(NK268, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0.25)
+head(NK268.markersALL, 12)
+write.csv(NK268.markersALL, "N268ALLMarkers.csv")
+head(NK268.markersALL[which(NK268.markersALL$cluster==0),], 10)
+head(NK268.markersALL[which(NK268.markersALL$cluster==1),], 10)
+head(NK268.markersALL[which(NK268.markersALL$cluster==2),], 10)
+```
+
+```{r find markers NK268}
+NK268.markers01 <- FindMarkers(NK268, ident.1 = "0", ident.2 = "1")
+head(NK268.markers01, 10)
+write.csv(NK268.markers01, "NK268.markers01.csv")
+
+NK268.markers02 <- FindMarkers(NK268, ident.1 = "0", ident.2 = "2")
+head(NK268.markers02, 10)
+write.csv(NK268.markers02, "NK268.markers02.csv")
+
+NK268.markers12 <- FindMarkers(NK268, ident.1 = "1", ident.2 = "2")
+head(NK268.markers12, 10)
+write.csv(NK268.markers12, "NK268.markers12.csv")
+```
+
+
+```{r features}
+featuresNK = c("GNLY", "KLRK1", "KLRC2", "KLRC3", "CD3E", "NCAM1", "FCGR3A", "CD226", "GZMA", "GZMB", "GZMH", "GZMK", "PRF1", "TNF", "IFNG", "IL7R")
+```
+
+```{r feature plots NK8}
+FeaturePlot(NK8, features = featuresNK)
+
+pdf("featureplot_NK8.pdf")
+FeaturePlot(NK8, features = featuresNK)
+dev.off()
+```
+
+```{r feature plots NK268}
+FeaturePlot(NK268, features = featuresNK)
+
+pdf("featureplots_NK268.pdf")
+FeaturePlot(NK268, features = featuresNK)
+dev.off()
+```
+
+```{r violin plot NK8}
+VlnPlot(NK8, features = featuresNK)
+
+pdf("violinPlots_NK8.pdf")
+VlnPlot(NK8, features = featuresNK, log = T)
+dev.off()
+```
+
+```{r violin plot NK268}
+VlnPlot(NK268, features = featuresNK)
+
+pdf("violinPlots_NK268.pdf")
+VlnPlot(NK268, features = featuresNK, log = T)
+dev.off()
+```
+
+
+```{r CD56 bright}
+CD56Bright = c("LTB", "IL7R", "GZMK", "XCL1", "LST1", "CD44", "SOX4", "SELL")
+# VlnPlot(NK8, features = CD56Bright)
+
+pdf("NK268_CD56bright.pdf")
+VlnPlot(NK268, features = CD56Bright, log = T)
+dev.off()
+```
+
+```{r translational}
+TranslationalNK = c("GZMK", "XCL1", "CMC1", "XCL2", "CD44", "IFRD1", "RP11-277L2.4", "PIK3R1")
+# VlnPlot(NK8, features = TranslationalNK, log = T)
+VlnPlot(NK268, features = TranslationalNK, log = T)
+```
+
+```{r Active}
+ActiveNK = c("CCL3", "ZFP36", "IER2", "JUNB", "MT2A", "FOS", "TSPYL2", "NR4A2")
+# VlnPlot(NK8, features = ActiveNK, log = T)
+VlnPlot(NK268, features = ActiveNK, log = T)
+```
+
+```{r Adaptive}
+AdaptiveNK = c("KLRC2", "CD3E", "CD52", "S100A6", "CCL5", "VIM", "TMIGD2", "CORO1A")
+# VlnPlot(NK8, features = AdaptiveNK, log = T)
+VlnPlot(NK268, features = AdaptiveNK, log = T)
+```
+
+```{r Mature}
+MatureNK = c("PRF1", "FCGR3A", "SPON2", "MYOM2", "ACTB", "GZMA", "GZMB", "S100A11")
+# VlnPlot(NK8, features = MatureNK, log = T)
+VlnPlot(NK268, features = MatureNK, log = T)
+```
+
+```{r Terminal}
+TerminalNK = c("WDR74", "TMEM107", "SNORD3A", "RP11-386I14.4", "LINC00910", "RNU12", "SNORD3D", "SNORD3B-2")
+VlnPlot(NK268, features = TerminalNK, log = T)
+```
+
+```{r Inflamed}
+InflamedNK = c("IFIT2", "IFIT3", "CCL3", "PMAIP1", "CCL3L1", "TNF", "CCL3L3", "CCL4")
+# VlnPlot(NK8, features = InflamedNK, log = T)
+VlnPlot(NK268, features = InflamedNK, log = T)
+```
+
+```{r TRM}
+TRMNK = c("CD69", "ITGAE", "ITGA1", "ZNF683", "SELL", "S1PR5", "KLF2", "KLF3", "IFNG", "TNF", "CSF2")
+# VlnPlot(NK8, features = TRMNK, log = T)
+pdf("NK_TRM.pdf")
+VlnPlot(NK268, features = TRMNK, log = T)
+dev.off
+```
+
+```{r GOI}
+NKGOI = c("GNLY", "KLRK1", "KLRC2", "FCGR3A", "PRF1", "GZMB", "IFNG", "CD69", "ITGAE", "ZNF683", "S1PR5", "KLF2")
+# VlnPlot(NK8, features = TRMNK, log = T)
+pdf("NK_GOI.pdf")
+VlnPlot(NK268, features = NKGOI, log = T)
+dev.off
+```
