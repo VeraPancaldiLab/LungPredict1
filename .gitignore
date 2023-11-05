@@ -1,3 +1,4 @@
 # ignore ALL files in ANY directory named temp
 Input/*
 IHC/* 
+.Rproj.user
