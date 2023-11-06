@@ -11,6 +11,9 @@ source(paste0(getwd(),"/environment_set.R"))
 libraries_set()
 ```
 
+To install SeuratDisk, firt
+- sudo apt-get install libhdf5-dev
+
 Load seurat object 
 ```{r}
 #Convert("all_samples.h5ad", dest = "h5seurat", overwrite = T)
