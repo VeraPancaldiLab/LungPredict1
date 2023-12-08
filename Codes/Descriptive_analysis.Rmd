@@ -14,13 +14,13 @@ libraries_set()
 Load Raw data from LungPredict
 ```{r}
 #Import Counts
-Counts <- as.matrix(read.table("/home/marcelo/LungPredict1/RawFiles/LP_STAR_RSEM_matrix_LEILA.txt", header=T, row.names = 1))
+Counts <- as.matrix(read.table("../../RawFiles/LP_STAR_RSEM_matrix_LEILA.txt", header=T, row.names = 1))
 colnames(Counts) = gsub("X.home.leilak.......media.leilak.LaCie.LungPredict.Adenocarcinoma.RSEM.RNAseq_quals.", "", colnames(Counts))
 colnames(Counts) = gsub(".genes.results", "", colnames(Counts))
 Counts <- as.data.frame(Counts)
 
 ##Import Clinical data
-clinical.data <- data.frame(read.csv("/home/marcelo/LungPredict1/RawFiles/ColumnData_LungPredict.csv", row.names = 1))
+clinical.data <- data.frame(read.csv("../../RawFiles/ColumnData_LungPredict.csv", row.names = 1))
 ```
 
 Number of patients across Stages 
@@ -56,7 +56,10 @@ ggplot(data, aes(fill=as.factor(condition), y=value, x=stages)) +
        y = "Patients",
        title = "Tumor stages across patients",
        fill = "Gender") +
-  scale_fill_manual(values=c("#1C4E80", "#EA6A47"))
+  scale_fill_manual(values=c("#1C4E80", "#EA6A47")) +
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15), 
+        axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15), axis.text.y = element_text(size = 15))
 ```
 Percentage of patients by batch 
 ```{r}
@@ -71,7 +74,7 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   coord_polar("y", start = 0)+
   geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=6, color = "black")+
   theme_void() +
-  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15)) +
   labs(title = "Patients by batch",
        fill = "Batch") +
   scale_fill_manual(values = c("#7E909A", "#1C4E80", "#A5D8DD", "#EA6A47"), labels=c('Batch 1', 'Batch 2', 'Batch 3', 'Batch 4')) 
@@ -96,7 +99,10 @@ ggplot(data, aes(fill=factor(condition), y=value, x=mutation)) +
        title = "Mutations presence across patients",
        fill = "Presence") +
   scale_fill_manual(values=c("#0091D5", "#EA6A47"))+
-  coord_flip()
+  coord_flip() +
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15), 
+        axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15), axis.text.y = element_text(size = 15))
 ```
 Tumor metastatic percentage
 ```{r}
@@ -110,7 +116,7 @@ ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
   geom_bar(stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
   theme_void() +
-  theme(legend.title = element_text(colour="black", size=14, face="bold"))+
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15)) +
   labs(title = "Tumor metastasis",
        fill = "Metastasis") +
   scale_fill_manual(values = c("#0091D5", "#F1F1F1")) +
@@ -137,7 +143,7 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   coord_polar("y", start = 0)+
   geom_text(aes(y=lab.ypos, label = paste0(round(prop), " %")), size=6, color = "black")+
   theme_void() +
-  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15))+
   labs(title = "Patients by Smoking Status",
        fill = "Smoking Status") +
   scale_fill_manual(values = c("#EA6A47", "#1C4E80", "#A5D8DD"), breaks = c('Old', 'No', 'Yes'), labels=c('Old', 'Never', 'Current')) 
@@ -154,7 +160,7 @@ ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
   geom_bar(stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
   theme_void() +
-  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15))+
   labs(title = "Patients Age bracket",
        fill = "Age bracket") +
   scale_fill_manual(values = c("#F1F1F1","#0091D5"),breaks = c('70Plus', 'Less70'), labels=c('More than 70 years old', 'Less than 70 years old')) +
@@ -170,7 +176,7 @@ ggplot(data, aes(x = 2, y = round(prop), fill = as.factor(x))) +
 ```
 Load raw clinical data
 ```{r}
-clinical.data2 <- read.csv("~/LungPredict1/RawFiles/clinic_data_v2_clean.csv", row.names=1)
+clinical.data2 <- read.csv("../../RawFiles/clinic_data_v2_clean.csv", row.names=1)
 clinical.data2$puncture_location[which(clinical.data2$puncture_location=="Extra-thoracique")] = "extra-thoracique"
 clinical.data2$puncture_location[which(clinical.data2$puncture_location=="")] = "NA"
 ```
@@ -188,7 +194,7 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   geom_col(width = 1, color = 1) +
   coord_polar("y", start = 0)+
   theme_void() +
-  theme(legend.title = element_text(colour="black", size=10, face="bold"))+
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15))+
   labs(title = "Patients diagnostic",
        fill = "Diagnostic") +
   scale_fill_manual(values = c("#EA6A47","#7E909A", '#A5D8DD', '#F1F1F1'),breaks = c('Adénocarcinome', 'Epidermoïde', 'Tumeur neuroendocrine', 'Autre'), 
@@ -226,7 +232,10 @@ ggplot(data, aes(fill=factor(x), y=freq, x=x)) +
        y = "Patients",
        fill = "Puncture location") +
   scale_fill_manual(values=c("#0091D5", "#A5D8DD"),breaks = c('Lung','Extra-thoracique'))+
-  coord_flip()
+  coord_flip()+
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15), 
+        axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15), axis.text.y = element_text(size = 15))
 
 ```
 Type of puncture 
@@ -247,7 +256,10 @@ ggplot(data, aes(fill=factor(x), y=freq, x=x)) +
        y = "Patients",
        fill = "Type of puncture") +
   scale_fill_manual(values=c("#1C4E80", "#EA6A47"),breaks = c('Primary', 'Metastasis'))+
-  coord_flip()
+  coord_flip()+
+  theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15), 
+        axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15), axis.text.y = element_text(size = 15))
 ```
 
 
