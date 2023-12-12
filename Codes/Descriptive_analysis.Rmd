@@ -138,6 +138,7 @@ data <- count(clinical.data$Smoking_Status) %>%
   arrange(desc(x)) %>%
   mutate(lab.ypos = cumsum(prop) - 0.5*prop)
 
+data$x[2] = "Ex-smoker" 
 ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   geom_bar(width = 1, stat = "identity", color = "white") +
   coord_polar("y", start = 0)+
@@ -146,7 +147,7 @@ ggplot(data, aes(x = "", y = round(prop), fill = as.factor(x))) +
   theme(legend.title = element_text(colour="black", size=15, face="bold"), legend.text = element_text(size=15))+
   labs(title = "Patients by Smoking Status",
        fill = "Smoking Status") +
-  scale_fill_manual(values = c("#EA6A47", "#1C4E80", "#A5D8DD"), breaks = c('Old', 'No', 'Yes'), labels=c('Old', 'Never', 'Current')) 
+  scale_fill_manual(values = c("#EA6A47", "#1C4E80", "#A5D8DD"), breaks = c('Ex-smoker', 'No', 'Yes'), labels=c('Ex-smoker', 'Never', 'Current')) 
 ```
 Age Bracket proportion 
 ```{r}
