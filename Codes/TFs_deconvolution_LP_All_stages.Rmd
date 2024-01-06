@@ -1,0 +1,199 @@
+---
+title: "TFs all stages"
+output: html_document
+date: "2024-01-06"
+---
+
+Input data
+```{r}
+Counts_normalized <- read.csv("~/Documents/LungPredict1_complete/Output/Counts_normalized_vsd_LungPredict.csv", row.names = 1)
+##Clean names
+m2 <- do.call(rbind, strsplit(rownames(Counts_normalized), split="_", fixed = TRUE))
+Counts_normalized = as.matrix(Counts_normalized)
+rownames(Counts_normalized) = m2[,2]
+```
+
+TFs analysis
+```{r}
+library(dplyr)
+library(tidyr)
+library(tibble)
+compute_TFs_scores = function(RNA.counts.normalized){
+  require(viper)
+  require(dorothea)
+
+  dorothea2viper_regulons <- function(df) {
+    regulon_list <- split(df, df$tf)
+    viper_regulons <- lapply(regulon_list, function(regulon) {
+      tfmode <- stats::setNames(regulon$mor, regulon$target)
+      list(tfmode = tfmode, likelihood = rep(1, length(tfmode)))
+    })
+    
+    return(viper_regulons)
+  }
+  
+  data("dorothea_hs", package = "dorothea")
+  regulons <- dorothea_hs %>%
+    filter(confidence %in% c("A", "B", "C", "D"))
+  
+  regu <- dorothea2viper_regulons(regulons)
+  RNA.counts.normalized = as.data.frame(RNA.counts.normalized)
+  vpres<- viper(RNA.counts.normalized, regu, verbose = FALSE, minsize = 4, method = "scale")
+  
+  return(vpres)
+  
+}
+
+TFs = compute_TFs_scores(Counts_normalized)
+```
+
+Raw correlation and grouping
+```{r}
+library(dendextend)
+rows.cor <- cor(t(TFs), use = "pairwise.complete.obs", method = "pearson")
+hc <- as.dendrogram(hclust(as.dist(1 - rows.cor)))
+png("TFs_all_stages", width = 9500, height = 4500, res=150)
+plot(hc)
+rect.dendrogram(hc, h = 1,horiz=F)
+dev.off()
+clusters <- cutree(hc, h = 1)
+
+minAbsValue <- abs(min(TFs))
+TFs = TFs + minAbsValue
+TFs_modules = TFs %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+
+rows.cor <- cor(t(TFs_modules), use = "pairwise.complete.obs", method = "pearson")
+hc <- as.dendrogram(hclust(as.dist(1 - rows.cor)))
+
+png("TFs_modules_all_stages", width = 9500, height = 4500, res=150)
+plot(hc)
+rect.dendrogram(hc, h = 1,horiz=F)
+dev.off()
+clusters2 <- cutree(hc, h = 1)
+
+TFs_modules_merge = TFs_modules %>%
+  as_tibble() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters2)) %>%
+  group_by(Cluster) %>%
+  summarise(across(everything(), mean)) %>%
+  column_to_rownames("Cluster")
+```
+
+Deconvolution
+```{r}
+source("~/Documents/LungPredict1_complete/Codes/Algorithm_subgrouping.R")
+source("~/Documents/LungPredict1_complete/Codes/environment_set.R")
+deconv <- as.matrix(read.delim("~/Documents/LungPredict1_complete/Input/Deconvolution/Deconvolution_LungPredict.txt", row.names = 1))
+#Removing MCP 
+deconv <- deconv[,-grep("MCP", colnames(deconv))]
+#Removing CD226
+deconv <- deconv[,-grep("CD226", colnames(deconv))]
+```
+
+Unsupervised filtering 
+```{r}
+library(matrixStats)
+#Remove columns with low variance (no much change across samples)
+deconv = data.frame(deconv[,-which(colVars(deconv)<=summary(colVars(deconv))[2])])
+#Remove columns with more than 70% of zeros
+i <- colSums(deconv == 0, na.rm=TRUE) < round(0.7*nrow(deconv))
+deconv <- data.frame(deconv[, i, drop=FALSE])
+```
+
+Split by cell types
+```{r}
+cells = compute_cell.types(data.frame(deconv))
+```
+
+Pairwise correlation filtering
+```{r}
+for (i in 1:length(cells)) {
+  data = cells[[i]]
+  if(ncol(data)>1){
+    data = removeCorrelatedFeatures(data)
+    cells[[i]] = data
+  }
+}
+```
+
+Subgrouping deconvolution 
+```{r}
+library(reshape2)
+library(stringr)
+library(purrr)
+res = list()
+groups = list()
+groups_similarity = list()
+for (i in 1:length(cells)) {
+  x = compute_subgroups(cells[[i]], names(cells)[i])
+  res = c(res, x[1])
+  groups = c(groups, x[2])
+  groups_similarity = c(groups_similarity, x[4])
+}
+names_cells = c("B", "MACROPHAGES", "M0", "M1", "M2", "MONOCYTES", "NEUTROPHILS", "NK", "NK.ACTIVATED", "NK.RESTING", "NKT", "CD4", "CD4.ACTIVATED", "CD4.RESTING", "CD8", "TREGS", "DENDRITIC", "DENDRITIC.ACTIVATED", "DENDRITIC.RESTING", "CANCER", "ENDOTHELIAL", "CAF")
+names(res) = names_cells
+names(groups) = names_cells
+names(groups_similarity) = names_cells
+
+#Res and Groups 
+ls = remove_subgroups(groups)
+for (i in 1:length(groups)) {
+  idx = which(names(groups[[i]])%in%ls)
+  idy = which(names(res[[i]])%in%ls)
+  if(length(idx)>0){
+    groups[[i]] = groups[[i]][-idx] 
+    res[[i]] = res[[i]][-idy] 
+  }
+}
+```
+
+Output deconvolution
+```{r}
+dt = c()
+for (i in 1:length(res)) {
+  dt = c(dt, res[[i]])
+}
+dt = data.frame(dt)
+rownames(dt) = rownames(deconv)
+```
+
+```{r}
+TFs_clusters = TFs %>%
+  data.frame() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters))
+
+modtfs = list()
+for(i in 1:nrow(TFs_modules)){
+  modtfs[[i]] = rownames(TFs_clusters)[which(TFs_clusters$Cluster%in%rownames(TFs_modules)[i])]
+  names(modtfs)[i] = rownames(TFs_modules)[i]
+}
+
+TFs_clusters2 = TFs_modules %>%
+  data.frame() %>%
+  mutate("Cluster" = paste0("Cluster ", clusters2))
+
+modtfs_clusters = list()
+for(i in 1:nrow(TFs_modules_merge)){
+  modtfs_clusters[[i]] = rownames(TFs_clusters2)[which(TFs_clusters2$Cluster%in%rownames(TFs_modules_merge)[i])]
+  names(modtfs_clusters)[i] = rownames(TFs_modules_merge)[i]
+}
+```
+
+Deconvolution + TFs
+```{r}
+features = cbind(dt, t(TFs_modules_merge[,rownames(dt)]))
+features = minMax(features)
+rows.cor <- cor(features, use = "pairwise.complete.obs", method = "pearson")
+hc <- as.dendrogram(hclust(as.dist(1 - rows.cor)))
+png("Features", width = 9500, height = 4500, res=150)
+plot(hc)
+rect.dendrogram(hc, h = 1,horiz=F)
+dev.off()
+clusters <- cutree(hc, h = 1)
+```
+
