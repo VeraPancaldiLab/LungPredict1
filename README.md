@@ -36,7 +36,7 @@ Analysis was divided in two parts for Early (Stage I, II) and Late Stage (Stage 
 If you are interested in contributing to this project, please contact the project leader for more information (vera.pancaldi@inserm.fr)
 
 ## Authors
-- Marcelo Hurtado (https://github.com/Marcelo1308)
+- Marcelo Hurtado (https://github.com/mhurtado13)
 - Leila Khajavi (https://github.com/LeilaKhajavi)
 - Mouneem Essabar (https://github.com/mouneem)
 - Vera Pancaldi (https://github.com/VeraPancaldi)
