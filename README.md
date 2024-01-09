@@ -16,10 +16,11 @@ Bulk RNASeq data from NSCLC patients
 ![image](https://github.com/VeraPancaldiLab/LungPredict1/assets/37853385/2641fa06-91e4-46f5-bc6f-4f83baacb035)
 
 ## Project organization
-- Scripts: Codes used to develop the project's methods 
+- Scripts: Codes used to develop the project's methods. 
 - Figures: Images results from analysis in Early and Late Stage patients
 - Output: Result files from analysis in Early and Late Stage patients
-  
+For producing the figures of the paper, use file `Scripts/Analysis_EarlyStage.rmd`
+
 ## Methodology
 Analysis was divided in two parts for Early (Stage I, II) and Late Stage (Stage IV) patients. Some of the methods used:
 - Unsupervised and supervised analysis
