@@ -17,8 +17,10 @@ Bulk RNASeq data from NSCLC patients
 ## Project organization
 - Scripts: Codes used to develop the project's methods. 
 - Figures: Images results from analysis in Early and Late Stage patients
-- Output: Result files from analysis in Early and Late Stage patients
-For producing the figures of the paper, use file `Scripts/Analysis_EarlyStage.rmd`
+- Output: Result files from analysis.
+  
+For reproduce the figures of the paper, use file `Scripts/Analysis_EarlyStage.rmd`
+For reproduce the figures of the single cell part, use file `Scripts/VANscRNAseq.rmd`
 
 ## Methodology
 Analysis was divided in two parts for Early (Stage I, II) and Late Stage (Stage IV) patients. Some of the methods used:
