@@ -1,3 +1,5 @@
+## Please visit https://github.com/VeraPancaldiLab/LungPredict1_paper/tree/main for the updated version of the Lung Predict project.
+
 # LungPredict 
 
 Profiling the Non-Small Cell Lung Cancer (NSCLC) microenvironment by integrating transcriptomics to uncover potential  phenotypic profiles associated to patterns in immune infiltration
