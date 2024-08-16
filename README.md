@@ -1,4 +1,4 @@
-## Please visit https://github.com/VeraPancaldiLab/LungPredict1_paper/tree/main for the updated version of the Lung Predict project.
+### Please visit https://github.com/VeraPancaldiLab/LungPredict1_paper/tree/main for the updated version of the Lung Predict project.
 
 # LungPredict 
 
