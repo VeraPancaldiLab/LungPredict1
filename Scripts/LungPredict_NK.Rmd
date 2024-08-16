@@ -1,0 +1,1069 @@
+---
+title: "LungPredict_NK"
+author: "LFK"
+date: "Sept 18, 2023"
+output: html_document
+---
+
+```{r libraries}
+library(DESeq2)
+# library(edgeR)
+library(RColorBrewer)
+library(ggplot2)
+library(pheatmap)
+library(dplyr)
+library(scales)
+library(clusterProfiler)
+library(pathview)
+library(ComplexHeatmap)
+library(DOSE)
+library(EnhancedVolcano)
+library(enrichplot)
+library(dendextend)
+library(gprofiler2)
+
+```
+
+``` {r count tables and histographs}
+# load data matrix
+LP_countDATA = as.matrix(read.csv("LP_STAR_RSEM_matrix_LEILA.txt", sep="\t", row.names=1))
+head(LP_countDATA)
+head(colnames(LP_countDATA))
+colnames(LP_countDATA) = gsub("X.home.leilak.......media.leilak.LaCie.LungPredict.Adenocarcinoma.RSEM.RNAseq_quals.", "", colnames(LP_countDATA))
+colnames(LP_countDATA) = gsub(".genes.results", "", colnames(LP_countDATA))
+colnames(LP_countDATA)
+LP_countDATA = round(LP_countDATA)
+any(LP_countDATA < 0)
+storage.mode(LP_countDATA) = "integer"
+any(LP_countDATA != "integer")
+
+# Batch Age_Bracket	Gender	Metastatic	Smoking_Status	Stages_simplified   EGFR_mut  KRAS_mut  STK11_mut
+colDATA = read.csv("ColumnData_LungPredict_NK.csv", sep =",", header=TRUE, row.names=1)
+head(colDATA)
+rownames(colDATA)
+colnames(colDATA)
+colDATA$Age_Bracket = factor(colDATA$Age_Bracket)
+colDATA$Gender = factor(colDATA$Gender)
+colDATA$Smoking_Status = factor(colDATA$Smoking_Status)
+colDATA$Stages_simplified = factor(colDATA$Stages_simplified)
+colDATA$NK_cluster = factor(colDATA$NK_cluster)
+colDATA$Batch = factor(colDATA$Batch)
+colDATA$EGFR_mut = factor(colDATA$EGFR_mut)
+colDATA$KRAS_mut = factor(colDATA$KRAS_mut)
+colDATA$STK11_mut = factor(colDATA$STK11_mut)
+
+
+countDATA = data.frame(LP_countDATA[, colnames(LP_countDATA) %in% rownames(colDATA)])
+head(countDATA)
+dim(countDATA)
+colnames(countDATA)
+rownames(colDATA)
+
+# 
+# ################# TPM
+# TPM_normalization <- function(data, log = FALSE, pseudo = 1) {
+#     
+#     # TPM normalization
+#     if(log){
+#         
+#         if (pseudo == 0)
+#           
+#             warning("Using 0 pseudo: Inf may be generated.\n")
+#       
+#         data <- log2(data + pseudo)
+#     }
+#     
+#     TPM_data <- t(t(data)*1e6/apply(data,2,sum))
+#     
+#     return(TPM_data)
+# }
+# 
+# 
+# LP_ALL_TMP = TPM_normalization(LP_countDATA)
+# head(LP_ALL_TMP)
+# head(LP_countDATA)
+# 
+# 
+# m1 <- do.call(rbind, strsplit(rownames(LP_ALL_TMP), split="_", fixed = TRUE))
+# head(m1[,2])
+# rownames(LP_ALL_TMP) = m1[,2]
+# # LP_ALL_TMP = LP_ALL_TMP[-c(58677:58681),]
+# head(LP_ALL_TMP)
+# tail(LP_ALL_TMP)
+# # LP_ALL_TMP = as.matrix(LP_ALL_TMP)
+# 
+# 
+# write.csv(as.data.frame(LP_ALL_TMP), file = "LP_ALL_TMP_geneName.csv")
+# ###################
+
+
+dds = DESeqDataSetFromMatrix(countData = countDATA, colData = colDATA, design = ~ Batch + Smoking_Status + EGFR_mut + KRAS_mut + STK11_mut + Gender + Age_Bracket + NK_cluster)
+head(dds)
+
+dds = DESeq(dds)
+head(dds)
+resultsNames(dds)
+
+# resultsALL = results(dds)
+# resultsALL
+# 
+# DESeq2::plotMA(resultsALL)
+# 
+# resultsNames(dds)
+# OrderedResultsALL = resultsALL[order(resultsALL$padj),]
+# OrderedResultsALL
+# summary(OrderedResultsALL)
+
+
+# vsd_ALL = varianceStabilizingTransformation(dds, blind = FALSE)
+# head(assay(vsd_ALL), 5)
+# colnames(assay(vsd_ALL))
+# 
+# 
+# vsd_BatchCorr = varianceStabilizingTransformation(dds, blind = FALSE)
+# assay(vsd_BatchCorr) = limma::removeBatchEffect(assay(vsd_BatchCorr), vsd_BatchCorr$Batch)
+# 
+# SampleDist_BC = dist(t(assay(vsd_BatchCorr)))
+# colnames(assay(vsd_BatchCorr))
+# SampleDistMatrix_BC = as.matrix(SampleDist_BC)
+# rownames(SampleDistMatrix_BC) = paste(colnames(assay(vsd_BatchCorr)), sep = ":")
+# colnames(SampleDistMatrix_BC) = NULL
+# colors = colorRampPalette( rev(brewer.pal(9, "Purples")) )(255)
+# png("Dist_Matrix_LP_BC.png")
+# pheatmap(SampleDistMatrix_BC, clustering_distance_rows = SampleDist_BC, clustering_distance_cols = SampleDist_BC, col=colors)
+# dev.off()
+# 
+# # for clustering
+# rv_BC = rowVars(assay(vsd_BatchCorr))
+# rv_BC_Order = order(rv_BC, decreasing = TRUE)
+# vsd_BatchCorr_dist = dist(t(assay(vsd_BatchCorr)[head(rv_BC_Order, 500),]))
+# vsd_hclust_BC = hclust(vsd_BatchCorr_dist, "ward.D2")
+# 
+# vsd_BatchCorr_dend = as.dendrogram(vsd_hclust_BC)
+# palette(brewer.pal(8, "Dark2"))
+# vsd_BatchCorr_dend_Order = order.dendrogram(vsd_BatchCorr_dend)
+# labels(vsd_BatchCorr_dend) = vsd_BatchCorr$Stages_simplified[vsd_BatchCorr_dend_Order]:vsd_BatchCorr$EGFR_mut[vsd_BatchCorr_dend_Order]:vsd_BatchCorr$KRAS_mut[vsd_BatchCorr_dend_Order]:vsd_BatchCorr$STK11_mut[vsd_BatchCorr_dend_Order]
+# labels_colors(vsd_BatchCorr_dend) = as.integer(vsd_BatchCorr$Gender[vsd_BatchCorr_dend_Order])
+# 
+# # plain graphic
+# pdf("ClusterDendogram_BC.pdf")
+# plot(vsd_hclust_BC)
+# dev.off()
+# 
+# # fancy graphic
+# pdf("ClusterDendogram_BC_Color.pdf")
+# plot(vsd_BatchCorr_dend, main="EGFR:KRAS:STK11 mutations", sub="color code: Gender")
+# dev.off()
+```
+
+```{r PCA}
+vsd_ALL = varianceStabilizingTransformation(dds, blind = FALSE)
+head(assay(vsd_ALL), 5)
+colnames(assay(vsd_ALL))
+
+SampleDist = dist(t(assay(vsd_ALL)))
+colnames(assay(vsd_ALL))
+SampleDistMatrix = as.matrix(SampleDist)
+rownames(SampleDistMatrix) = paste(colnames(assay(vsd_ALL)), sep = ":")
+colnames(SampleDistMatrix) = NULL
+colors = colorRampPalette( rev(brewer.pal(9, "Purples")) )(255)
+png("Dist_Matrix_LP.png")
+pheatmap(SampleDistMatrix, clustering_distance_rows = SampleDist, clustering_distance_cols = SampleDist, col=colors)
+dev.off()
+
+# for clustering
+rv_ALL = rowVars(assay(vsd_ALL))
+rv_ALL_Order = order(rv_ALL, decreasing = TRUE)
+vsd_ALL_dist = dist(t(assay(vsd_ALL)[head(rv_ALL_Order, 500),]))
+vsd_hclust = hclust(vsd_ALL_dist, "ward.D2")
+
+vsd_ALL_dend = as.dendrogram(vsd_hclust)
+palette(brewer.pal(8, "Dark2"))
+vsd_ALL_dend_Order = order.dendrogram(vsd_ALL_dend)
+labels(vsd_ALL_dend) = vsd_ALL$EGFR_mut[vsd_ALL_dend_Order]:vsd_ALL$KRAS_mut[vsd_ALL_dend_Order]:vsd_ALL$STK11_mut[vsd_ALL_dend_Order]:vsd_ALL$NK_cluster[vsd_ALL_dend_Order]
+labels_colors(vsd_ALL_dend) = as.integer(vsd_ALL$Stages_simplified[vsd_ALL_dend_Order])
+
+# plain graphic
+pdf("ClusterDendogram_ALL.pdf")
+plot(vsd_hclust)
+dev.off()
+
+# fancy graphic
+pdf("ClusterDendogram_ALL_Color.pdf")
+plot(vsd_ALL_dend, main="NK_clusters based on TF and deconvolution", sub="color code: Stages")
+dev.off()
+
+
+dataTOP100vsd = plotPCA(vsd_ALL, intgroup=c("Age_Bracket", "Gender", "Batch", "NK_cluster", "Smoking_Status", "EGFR_mut", "KRAS_mut", "STK11_mut"), ntop=100, returnData=TRUE)
+percVar_100 = round(100 * attr(dataTOP100vsd, "percentVar"))
+png("PCAplot_filt_vsd100.png")
+ggplot(dataTOP100vsd, aes(PC1, PC2, color=EGFR_mut:KRAS_mut:STK11_mut, shape=NK_cluster)) + geom_point(size=3) + xlab(paste0("PC1: ", percVar_100[1],"% variance")) + ylab(paste0("PC2: ", percVar_100[2],"% variance")) + coord_fixed()
+dev.off()
+
+
+dataALLvsd = plotPCA(vsd_ALL, intgroup=c("Age_Bracket", "Gender", "Batch", "NK_cluster", "Smoking_Status", "EGFR_mut", "KRAS_mut", "STK11_mut"), returnData=TRUE)
+percVar_ALL = round(100 * attr(dataALLvsd, "percentVar"))
+png("PCAplot_filt_vsdALL.png")
+ggplot(dataALLvsd, aes(PC1, PC2, color=EGFR_mut:KRAS_mut:STK11_mut, shape=NK_cluster)) + geom_point(size=3) + xlab(paste0("PC1: ", percVar_ALL[1],"% variance")) + ylab(paste0("PC2: ", percVar_ALL[2],"% variance")) + coord_fixed()
+dev.off()
+
+
+LabelID = rownames(colDATA)
+png("PCAplot_vsd100_LP_GenderStages.png")
+ggplot(dataTOP100vsd, aes(PC1, PC2, color = Gender, shape = NK_cluster, label=LabelID)) + 
+  geom_point(size=4) + 
+  geom_point(color = "grey70", size = 1) +
+  xlab(paste0("PC1: ", percVar_100[1],"% variance")) + 
+  ylab(paste0("PC2: ", percVar_100[2],"% variance")) + 
+  geom_text(size = 3, hjust = 0, nudge_x = -2, nudge_y = -1) +
+  theme_bw() +
+  ggtitle("Principal Component Analysis", subtitle = "Top 100 Genes") +
+  # scale_shape_manual(values = c(0, 2, 3, 8)) +
+  # scale_color_manual(values=c("Purple", "Orange", "Blue")) +
+  # stat_ellipse() +
+  coord_fixed()
+dev.off()
+
+png("PCAplot_vsd100_LP_StagesMut.png")
+ggplot(dataTOP100vsd, aes(PC1, PC2, color = EGFR_mut:KRAS_mut:STK11_mut, shape = NK_cluster, label=LabelID)) + 
+  geom_point(size=4) + 
+  geom_point(color = "grey70", size = 1) +
+  xlab(paste0("PC1: ", percVar_100[1],"% variance")) + 
+  ylab(paste0("PC2: ", percVar_100[2],"% variance")) + 
+  geom_text(size = 3, hjust = 0, nudge_x = -2, nudge_y = -1) +
+  theme_bw() +
+  ggtitle("Principal Component Analysis", subtitle = "Top 100 Genes") +
+  # scale_shape_manual(values = c(0, 2, 3, 8)) +
+  # scale_color_manual(values=c("Purple", "Orange", "Blue")) +
+  # stat_ellipse() +
+  # theme(legend.position = 'bottom') +
+  coord_fixed()
+dev.off()
+
+pdf("PCAplot_vsdALL_LP_GenderStagesELLIPSE.pdf")
+ggplot(dataALLvsd, aes(PC1, PC2, color = NK_cluster, shape = Gender, group=NK_cluster)) + 
+  geom_point(size=4) + 
+  geom_point(color = "grey70", size = 1) +
+  xlab(paste0("PC1: ", percVar_ALL[1],"% variance")) + 
+  ylab(paste0("PC2: ", percVar_ALL[2],"% variance")) + 
+  # geom_text(size = 3, hjust = 0, nudge_x = -2, nudge_y = -1) +
+  theme_bw() +
+  ggtitle("Principal Component Analysis", subtitle = "ALL Genes") +
+  # scale_shape_manual(values = c(0, 2, 3, 8)) +
+  # scale_color_manual(values=c("Purple", "Orange", "Blue")) +
+  stat_ellipse() +
+  coord_fixed()
+dev.off()
+
+pdf("PCAplot_vsdALL_LP_GenderStages.pdf")
+ggplot(dataALLvsd, aes(PC1, PC2, color = NK_cluster, shape = Gender)) + 
+  geom_point(size=4) + 
+  geom_point(color = "grey70", size = 1) +
+  xlab(paste0("PC1: ", percVar_ALL[1],"% variance")) + 
+  ylab(paste0("PC2: ", percVar_ALL[2],"% variance")) + 
+  # geom_text(size = 3, hjust = 0, nudge_x = -2, nudge_y = -1) +
+  theme_bw() +
+  ggtitle("Principal Component Analysis", subtitle = "ALL Genes") +
+  # scale_shape_manual(values = c(0, 2, 3, 8)) +
+  # scale_color_manual(values=c("Purple", "Orange", "Blue")) +
+  # stat_ellipse() +
+  coord_fixed()
+dev.off()
+
+
+
+pdf("PCAplot_vsdALL_LP_StagesMut.pdf")
+ggplot(dataALLvsd, aes(PC1, PC2, shape = EGFR_mut:KRAS_mut:STK11_mut, color = NK_cluster, group=NK_cluster)) + 
+  geom_point(size=4) + 
+  geom_point(color = "grey70", size = 1) +
+  xlab(paste0("PC1: ", percVar_ALL[1],"% variance")) + 
+  ylab(paste0("PC2: ", percVar_ALL[2],"% variance")) + 
+  # geom_text(size = 3, hjust = 0, nudge_x = -5, nudge_y = -1) +
+  theme_bw() +
+  ggtitle("Principal Component Analysis") +
+  # scale_shape_manual(values = c(0, 2, 3, 8)) +
+  # scale_color_manual(values=c("Purple", "Orange", "Blue")) +
+  stat_ellipse() +
+  coord_fixed()
+dev.off()
+
+
+# Histogram distribution of Count Data
+CountHisto = hist(as.matrix(log2(countDATA + 1)), breaks=100, col="blue", border="white",
+     main="LP Log2-transformed counts per gene", xlab="log2(counts+1)", ylab="Number of genes", las=1, cex.axis=0.7, ylim = c(0, 50000))
+
+
+```
+
+```{r NK clusters 1 and 2 ONLY}
+# NK cluster 1 vs 2
+NK_colDATA2 = colDATA
+NK_colDATA = NK_colDATA2[(NK_colDATA2$NK_cluster!="0"),]
+# NK_colDATA = NK_colDATA3[(NK_colDATA3$NK_cluster!="3"),]
+head(NK_colDATA)
+dim(NK_colDATA)
+NK_colDATA$NK_cluster = factor(NK_colDATA$NK_cluster)
+NK_colDATA$Stages_simplified = factor(NK_colDATA$Stages_simplified)
+NK_colDATA$Smoking_Status = factor(NK_colDATA$Smoking_Status)
+NK_colDATA$Gender = factor(NK_colDATA$Gender)
+NK_colDATA$Batch = factor(NK_colDATA$Batch)
+NK_colDATA$Age_Bracket = factor(NK_colDATA$Age_Bracket)
+NK_colDATA$EGFR_mut = factor(NK_colDATA$EGFR_mut)
+NK_colDATA$KRAS_mut = factor(NK_colDATA$KRAS_mut)
+NK_colDATA$STK11_mut = factor(NK_colDATA$STK11_mut)
+
+
+NK_countDATA = data.frame(countDATA[, colnames(countDATA) %in% rownames(NK_colDATA)])
+head(NK_countDATA)
+dim(NK_countDATA)
+
+BCSCountHisto = hist(as.matrix(log2(NK_countDATA + 1)), breaks=100, col="blue", border="white",
+     main="LP (Stage I and IV Only) Log2-transformed counts per gene", xlab="log2(counts+1)", ylab="Number of genes", las=1, cex.axis=0.7, ylim = c(0, 100000))
+
+dds_NK = DESeqDataSetFromMatrix(countData = NK_countDATA, colData = NK_colDATA, design = ~Batch + Smoking_Status + Gender + Age_Bracket + EGFR_mut + KRAS_mut + STK11_mut + Stages_simplified + NK_cluster)
+head(dds_NK)
+dim(dds_NK)
+
+# # prefiltering 
+# keep_OUT = rowSums(counts(dds_NK)) >= 10
+# dds_NK = dds_NK[keep_OUT, ]
+# dim(dds_NK)
+
+dds_NK = DESeq(dds_NK)
+head(dds_NK)
+resultsNames(dds_NK)
+```
+
+```{R PCA NKs}
+vsd_clust12 = varianceStabilizingTransformation(dds_NK, blind = FALSE)
+head(assay(vsd_clust12), 5)
+colnames(assay(vsd_clust12))
+
+SampleDist12 = dist(t(assay(vsd_clust12)))
+colnames(assay(vsd_clust12))
+SampleDistMatrix12 = as.matrix(SampleDist12)
+rownames(SampleDistMatrix12) = paste(colnames(assay(vsd_clust12)), sep = ":")
+colnames(SampleDistMatrix12) = NULL
+colors = colorRampPalette( rev(brewer.pal(9, "Purples")) )(255)
+png("Dist_Matrix_NK12.png")
+pheatmap(SampleDistMatrix12, clustering_distance_rows = SampleDist12, clustering_distance_cols = SampleDist12, col=colors)
+dev.off()
+
+# for clustering
+rv_clust12 = rowVars(assay(vsd_clust12))
+rv_clust12_Order = order(rv_clust12, decreasing = TRUE)
+vsd_clust12_dist = dist(t(assay(vsd_clust12)[head(rv_clust12_Order, 500),]))
+vsd_hclust12 = hclust(vsd_clust12_dist, "ward.D2")
+
+vsd_clust12_dend = as.dendrogram(vsd_hclust12)
+palette(brewer.pal(8, "Dark2"))
+vsd_clust12_dend_Order = order.dendrogram(vsd_clust12_dend)
+labels(vsd_clust12_dend) = vsd_clust12$EGFR_mut[vsd_clust12_dend_Order]:vsd_clust12$KRAS_mut[vsd_clust12_dend_Order]:vsd_clust12$STK11_mut[vsd_clust12_dend_Order]:vsd_clust12$NK_cluster[vsd_clust12_dend_Order]
+labels_colors(vsd_clust12_dend) = as.integer(vsd_clust12$NK_cluster[vsd_clust12_dend_Order])
+
+# plain graphic
+pdf("ClusterDendogram_clust12.pdf")
+plot(vsd_hclust12)
+dev.off()
+
+# fancy graphic
+pdf("ClusterDendogram_clust12_Color.pdf")
+plot(vsd_clust12_dend, main="NK_clusters based on TF and deconvolution", sub="color code: NK Clusters 1 and 2")
+dev.off()
+
+
+dataTOP100vsd12 = plotPCA(vsd_clust12, intgroup=c("Age_Bracket", "Gender", "Batch", "NK_cluster", "Smoking_Status", "EGFR_mut", "KRAS_mut", "STK11_mut"), ntop=100, returnData=TRUE)
+percVar_10012 = round(100 * attr(dataTOP100vsd12, "percentVar"))
+png("PCAplot_filt_vsd10012.png")
+ggplot(dataTOP100vsd12, aes(PC1, PC2, color=EGFR_mut:KRAS_mut:STK11_mut, shape=NK_cluster)) + geom_point(size=3) + xlab(paste0("PC1: ", percVar_10012[1],"% variance")) + ylab(paste0("PC2: ", percVar_10012[2],"% variance")) + coord_fixed()
+dev.off()
+
+
+dataALLvsd12 = plotPCA(vsd_clust12, intgroup=c("Age_Bracket", "Gender", "Batch", "NK_cluster", "Smoking_Status", "EGFR_mut", "KRAS_mut", "STK11_mut"), returnData=TRUE)
+percVar_clust12 = round(100 * attr(dataALLvsd12, "percentVar"))
+png("PCAplot_filt_vsd12.png")
+ggplot(dataALLvsd12, aes(PC1, PC2, color=EGFR_mut:KRAS_mut:STK11_mut, shape=NK_cluster)) + geom_point(size=3) + xlab(paste0("PC1: ", percVar_clust12[1],"% variance")) + ylab(paste0("PC2: ", percVar_clust12[2],"% variance")) + coord_fixed()
+dev.off()
+
+
+LabelID_NK = rownames(NK_colDATA)
+png("PCAplot_vsd100_LP12_GenderStages.png")
+ggplot(dataTOP100vsd12, aes(PC1, PC2, color = Gender, shape = NK_cluster, label=LabelID_NK)) + 
+  geom_point(size=4) + 
+  geom_point(color = "grey70", size = 1) +
+  xlab(paste0("PC1: ", percVar_10012[1],"% variance")) + 
+  ylab(paste0("PC2: ", percVar_10012[2],"% variance")) + 
+  geom_text(size = 3, hjust = 0, nudge_x = -2, nudge_y = -1) +
+  theme_bw() +
+  ggtitle("Principal Component Analysis", subtitle = "Top 100 Genes") +
+  # scale_shape_manual(values = c(0, 2, 3, 8)) +
+  # scale_color_manual(values=c("Purple", "Orange", "Blue")) +
+  # stat_ellipse() +
+  coord_fixed()
+dev.off()
+
+
+pdf("PCAplot_vsdNK12_LP_GenderStagesELLIPSE.pdf")
+ggplot(dataALLvsd12, aes(PC1, PC2, color = NK_cluster, shape = Gender, group=NK_cluster, label=LabelID_NK)) + 
+  geom_point(size=4) + 
+  geom_point(color = "grey70", size = 1) +
+  xlab(paste0("PC1: ", percVar_ALL[1],"% variance")) + 
+  ylab(paste0("PC2: ", percVar_ALL[2],"% variance")) + 
+  geom_text(size = 3, hjust = 0, nudge_x = -2, nudge_y = -1) +
+  theme_bw() +
+  ggtitle("Principal Component Analysis", subtitle = "ALL Genes") +
+  # scale_shape_manual(values = c(0, 2, 3, 8)) +
+  # scale_color_manual(values=c("Purple", "Orange", "Blue")) +
+  stat_ellipse() +
+  coord_fixed()
+dev.off()
+
+
+```
+
+```{r differential expression}
+results_NK = results(dds_NK, contrast = c("NK_cluster", "1", "2"), pAdjustMethod = "BH")
+results_NK = na.omit(results_NK)
+results_NK
+
+DESeq2::plotMA(results_NK)
+
+Orderedresults_NK = results_NK[order(results_NK$padj),]
+Orderedresults_NK
+summary(Orderedresults_NK)
+# out of 48715 with nonzero total read count
+# adjusted p-value < 0.1
+# LFC > 0 (up)       : 1308, 2.7%
+# LFC < 0 (down)     : 1222, 2.5%
+# outliers [1]       : 0, 0%
+# low counts [2]     : 0, 0%
+# (mean count < 0)
+
+sum(results_NK$padj < 0.1, na.rm = TRUE)
+# 2530
+sum(results_NK$padj < 0.05, na.rm = TRUE)
+# 1710
+sum(results_NK$padj < 0.01, na.rm = TRUE)
+# 872
+sum(results_NK$padj < 0.005, na.rm = TRUE)
+# 682
+sum(results_NK$padj < 0.001, na.rm = TRUE)
+# 402
+
+results_NK05 = results_NK[results_NK$padj < 0.05,]
+rownames(results_NK05)
+head(results_NK05)
+
+# m1 <- do.call(rbind, strsplit(rownames(results_NK), split="_", fixed = TRUE))
+# head(m1[,2])
+# rownames(results_NK) = m1[,2]
+# head(results_NK)
+# tail(results_NK)
+# # results_NK = as.matrix(results_NK)
+
+
+write.csv(as.data.frame(results_NK05), file = "NK_Cluster05_1vs2.csv")
+
+
+```
+
+```{r volcano plots}
+head(results_NK)
+dim(results_NK)
+
+pdf("NK_Clust12_volcanoPlot.pdf")
+EnhancedVolcano(results_NK,
+    title = "NK Cluster 1 vs 2",
+    subtitle = NULL,
+    caption = NULL,
+    lab = rownames(results_NK),
+    x = 'log2FoldChange',
+    y = 'padj',
+    # selectLab = c("ENSG00000183607_GKN2", "ENSG00000184811_TRARG1", "ENSG00000066405_CLDN18", "ENSG00000286123", "ENSG00000096088_PGC", "ENSG00000168878_SFTPB","ENSG00000168484_SFTPC", "ENSG00000122852_SFTPA1","ENSG00000185303_SFTPA2","ENSG00000162896_PIGR"),
+    xlim = c(-35, 35),
+    ylim = c(0, 40), 
+    pCutoff = 10e-2,
+    FCcutoff = 1)
+    # legendVisible = FALSE,
+    # transcriptPointSize = 4.0)
+    # transcriptLabFace = "bold",
+    # transcriptLabhjust = 0.3,
+    # col = c("grey30", "forestgreen", "chartreuse3", "chartreuse3"),
+    # transcriptLabSize = 6.0)
+dev.off()
+
+
+```
+
+
+```{r boxplots}
+GKN2_counts = plotCounts(dds, gene = "ENSG00000183607_GKN2", intgroup = c("Stages_simplified", "Gender"), returnData = TRUE)
+ggplot(GKN2_counts, aes(x=factor(Stages_simplified), y=count, color=Gender)) + scale_y_log10() + geom_point(position = "jitter") + coord_fixed()
+
+GKN2_Stages = ggplot(GKN2_counts, aes(x=factor(Stages_simplified), y=count, color = Gender)) +
+  geom_boxplot(outlier.shape = NULL, outlier.size = 0) +
+  geom_point(size=2, position = "jitter") +
+  scale_y_log10() +
+  # scale_shape_manual(values = c(3, 5)) +
+  scale_color_manual(values=c("Purple", "Orange")) +
+  # geom_text(size=3) +
+  ggtitle("GKN2") +
+  xlab("Stages") +
+  coord_fixed()
+  
+  ggsave(GKN2_Stages, file="GKN2_Stages.pdf")
+  
+pdf("GKN2_Stages.pdf")
+GKN2_Stages
+dev.off()
+
+  
+GKN2_counts_I_IV = plotCounts(dds_STAGES, gene = "ENSG00000183607_GKN2", intgroup = c("Stages_simplified", "Gender"), returnData = TRUE)
+ggplot(GKN2_counts_I_IV, aes(x=factor(Stages_simplified), y=count, color=Gender)) + scale_y_log10() + geom_point(position = "jitter") + coord_fixed()
+
+GKN2_Stages_I_IV = ggplot(GKN2_counts_I_IV, aes(x=factor(Stages_simplified), y=count, color = Gender)) +
+  geom_boxplot(outlier.shape = NULL, outlier.size = 0) +
+  geom_point(size=2, position = "jitter") +
+  scale_y_log10() +
+  # scale_shape_manual(values = c(3, 5)) +
+  scale_color_manual(values=c("Purple", "Orange")) +
+  # geom_text(size=3) +
+  ggtitle("GKN2") +
+  xlab("Stages") +
+  coord_fixed()
+  
+  ggsave(GKN2_Stages_I_IV, file="GKN2_Stages_I_IV.pdf")
+  
+pdf("GKN2_Stages_I_IV.pdf")
+GKN2_Stages_I_IV
+dev.off()
+  
+  
+```
+
+
+```{r upset Plot}
+##############
+### UpSet Plot
+##############
+
+##########
+### STAGE I vs IV
+# StageI_StageIV_Genes = row.names(StageI_StageIV)
+# head(StageI_StageIV_Genes)
+# 
+# results_STAGES_Genes = row.names(results_STAGES)
+# head(results_STAGES_Genes)
+# 
+# 
+# ### UPSET PLOT
+# STAGES_LIST = list(STAGEI_IV = StageI_StageIV_Genes,
+#                    ResultsSTAGES = results_STAGES_Genes)
+# 
+# STAGES_Matrix = make_comb_mat(STAGES_LIST)
+# set_name(STAGES_Matrix)
+# set_size(STAGES_Matrix)
+# comb_name(STAGES_Matrix)
+# comb_degree(STAGES_Matrix)
+# comb_size(STAGES_Matrix)
+# 
+# # extract_comb(STAGES_Matrix, "11")
+# 
+# ssSTAGES = set_size(STAGES_Matrix)
+# csSTAGES = comb_size(STAGES_Matrix)
+# htSTAGES = UpSet(STAGES_Matrix,
+# 	set_order = order(ssSTAGES),
+# 	# set_order = c(),
+# 	comb_order = order(comb_degree(STAGES_Matrix), -csSTAGES),
+# 	top_annotation = HeatmapAnnotation(
+# 		"Number of Genes" = anno_barplot(csSTAGES,
+#             ylim = c(0, max(csSTAGES)*1.1),
+# 			border = FALSE,
+# 			gp = gpar(fill = "darkseagreen1"),
+# 			height = unit(4, "cm")
+# 		),
+# 		annotation_name_side = "left",
+# 		annotation_name_rot = 90),
+# 	left_annotation = rowAnnotation(
+# 		"DEGs" = anno_barplot(-ssSTAGES,
+# 			baseline = 0,
+# 			axis_param = list(
+# 				at = c(0, -25, -50),
+# 				labels = c(0, 25, 50),
+# 				labels_rot = 0),
+# 			border = FALSE,
+# 			gp = gpar(fill = c("aquamarine3", "darkturquoise", "deepskyblue", "cornflowerblue", "steelblue")),
+# 			width = unit(4, "cm")
+# 		),
+# 		set_name = anno_text(set_name(STAGES_Matrix),
+# 			location = 0.5,
+# 			just = "center",
+# 			width = max_text_width(set_name(STAGES_Matrix)) + unit(4, "mm"))
+# 	),
+# 	right_annotation = NULL,
+# 	show_row_names = FALSE,
+# 	comb_col = c("firebrick4", "palevioletred2", "maroon2", "mediumorchid1", "plum1")[comb_degree(STAGES_Matrix)])
+# pdf("UpSet_STAGES_PLOT.pdf")
+# htSTAGES = draw(htSTAGES)
+# odSTAGES = column_order(htSTAGES)
+# sdSTAGES = order(ssSTAGES)
+# decorate_annotation("Number of Genes", {
+#     grid.text(csSTAGES[odSTAGES], x = seq_along(csSTAGES), y = unit(csSTAGES[odSTAGES], "native") + unit(4, "pt"),
+#         default.units = "native", just = c("left", "bottom"),
+#         gp = gpar(fontsize = 12, col = "#404040"), rot = 45)
+# })
+# decorate_annotation("DEGs", {
+#     grid.text(ssSTAGES[sdSTAGES], y = rev(seq_along(sdSTAGES)), x = unit(ssSTAGES[sdSTAGES], "native") + unit(4, "pt"),
+#         default.units = "native", just = "center", hjust = c(3, 4.3),
+#         gp = gpar(fontsize = 16, col = "#404040"))
+# })
+# dev.off()
+
+
+
+
+
+##########
+### STAGE I vs IV - FEMALES vs ALL
+results_STAGES_Genes = row.names(results_STAGES)
+head(results_STAGES_Genes)
+
+FEMresults_Genes = row.names(resultsFEM)
+head(FEMresults_Genes)
+
+### UPSET PLOT
+FEMvsALL_STAGES_LIST = list(ResultsSTAGES = results_STAGES_Genes,
+                   FEMResultsSTAGES = FEMresults_Genes)
+
+FEMvsALL_STAGES_Matrix = make_comb_mat(FEMvsALL_STAGES_LIST)
+set_name(FEMvsALL_STAGES_Matrix)
+set_size(FEMvsALL_STAGES_Matrix)
+comb_name(FEMvsALL_STAGES_Matrix)
+comb_degree(FEMvsALL_STAGES_Matrix)
+comb_size(FEMvsALL_STAGES_Matrix)
+
+# extract_comb(FEMvsALL_STAGES_Matrix, "11")
+
+ssSTAGES = set_size(FEMvsALL_STAGES_Matrix)
+csSTAGES = comb_size(FEMvsALL_STAGES_Matrix)
+htSTAGES = UpSet(FEMvsALL_STAGES_Matrix,
+	set_order = order(ssSTAGES),
+	# set_order = c(),
+	comb_order = order(comb_degree(FEMvsALL_STAGES_Matrix), -csSTAGES),
+	top_annotation = HeatmapAnnotation(
+		"Number of Genes" = anno_barplot(csSTAGES,
+            ylim = c(0, max(csSTAGES)*1.1),
+			border = FALSE,
+			gp = gpar(fill = "darkseagreen1"),
+			height = unit(4, "cm")
+		),
+		annotation_name_side = "left",
+		annotation_name_rot = 90),
+	left_annotation = rowAnnotation(
+		"DEGs" = anno_barplot(-ssSTAGES,
+			baseline = 0,
+			axis_param = list(
+				at = c(0, -25, -50),
+				labels = c(0, 25, 50),
+				labels_rot = 0),
+			border = FALSE,
+			gp = gpar(fill = c("aquamarine3", "darkturquoise", "deepskyblue", "cornflowerblue", "steelblue")),
+			width = unit(4, "cm")
+		),
+		set_name = anno_text(set_name(FEMvsALL_STAGES_Matrix),
+			location = 0.5,
+			just = "center",
+			width = max_text_width(set_name(FEMvsALL_STAGES_Matrix)) + unit(4, "mm"))
+	),
+	right_annotation = NULL,
+	show_row_names = FALSE,
+	comb_col = c("firebrick4", "palevioletred2", "maroon2", "mediumorchid1", "plum1")[comb_degree(FEMvsALL_STAGES_Matrix)])
+pdf("UpSet_FEMSTAGES_PLOT.pdf")
+htSTAGES = draw(htSTAGES)
+odSTAGES = column_order(htSTAGES)
+sdSTAGES = order(ssSTAGES)
+decorate_annotation("Number of Genes", {
+    grid.text(csSTAGES[odSTAGES], x = seq_along(csSTAGES), y = unit(csSTAGES[odSTAGES], "native") + unit(4, "pt"),
+        default.units = "native", just = c("left", "bottom"),
+        gp = gpar(fontsize = 12, col = "#404040"), rot = 45)
+})
+decorate_annotation("DEGs", {
+    grid.text(ssSTAGES[sdSTAGES], y = rev(seq_along(sdSTAGES)), x = unit(ssSTAGES[sdSTAGES], "native") + unit(4, "pt"),
+        default.units = "native", just = "center", hjust = c(4.6, 5),
+        gp = gpar(fontsize = 16, col = "#404040"))
+})
+dev.off()
+
+
+
+
+
+##########
+### STAGE IV KRAS
+StageIV_KRAS_YN_Genes = row.names(StageIV_KRAS_YN)
+head(StageIV_KRAS_YN_Genes)
+
+resultsIV_KRAS_Genes = row.names(resultsIV_KRAS)
+head(resultsIV_KRAS_Genes)
+
+
+### UPSET PLOT
+IV_KRAS_LIST = list(STAGEIV_KRAS = StageIV_KRAS_YN_Genes,
+                   ResultsSTAGE_KRAS = resultsIV_KRAS_Genes)
+
+IV_KRAS_Matrix = make_comb_mat(IV_KRAS_LIST)
+set_name(IV_KRAS_Matrix)
+set_size(IV_KRAS_Matrix)
+comb_name(IV_KRAS_Matrix)
+comb_degree(IV_KRAS_Matrix)
+comb_size(IV_KRAS_Matrix)
+
+extract_comb(IV_KRAS_Matrix, "11")
+# [1] "KCNJ6"   "SCGB3A2"
+
+ssIV_KRAS = set_size(IV_KRAS_Matrix)
+csIV_KRAS = comb_size(IV_KRAS_Matrix)
+htIV_KRAS = UpSet(IV_KRAS_Matrix,
+	set_order = order(ssIV_KRAS),
+	# set_order = c(),
+	comb_order = order(comb_degree(IV_KRAS_Matrix), -csIV_KRAS),
+	top_annotation = HeatmapAnnotation(
+		"Number of Genes" = anno_barplot(csIV_KRAS,
+            ylim = c(0, max(csIV_KRAS)*1.1),
+			border = FALSE,
+			gp = gpar(fill = "darkseagreen1"),
+			height = unit(4, "cm")
+		),
+		annotation_name_side = "left",
+		annotation_name_rot = 90),
+	left_annotation = rowAnnotation(
+		"DEGs" = anno_barplot(-ssIV_KRAS,
+			baseline = 0,
+			axis_param = list(
+				at = c(0, -25, -50),
+				labels = c(0, 25, 50),
+				labels_rot = 0),
+			border = FALSE,
+			gp = gpar(fill = c("aquamarine3", "darkturquoise", "deepskyblue", "cornflowerblue", "steelblue")),
+			width = unit(4, "cm")
+		),
+		set_name = anno_text(set_name(IV_KRAS_Matrix),
+			location = 0.5,
+			just = "center",
+			width = max_text_width(set_name(IV_KRAS_Matrix)) + unit(4, "mm"))
+	),
+	right_annotation = NULL,
+	show_row_names = FALSE,
+	comb_col = c("firebrick4", "palevioletred2", "maroon2", "mediumorchid1", "plum1")[comb_degree(IV_KRAS_Matrix)])
+pdf("UpSet_IV_KRAS_PLOT.pdf")
+htIV_KRAS = draw(htIV_KRAS)
+odIV_KRAS = column_order(htIV_KRAS)
+sdIV_KRAS = order(ssIV_KRAS)
+decorate_annotation("Number of Genes", {
+    grid.text(csIV_KRAS[odIV_KRAS], x = seq_along(csIV_KRAS), y = unit(csIV_KRAS[odIV_KRAS], "native") + unit(4, "pt"),
+        default.units = "native", just = c("left", "bottom"),
+        gp = gpar(fontsize = 12, col = "#404040"), rot = 45)
+})
+decorate_annotation("DEGs", {
+    grid.text(ssIV_KRAS[sdIV_KRAS], y = rev(seq_along(sdIV_KRAS)), x = unit(ssIV_KRAS[sdIV_KRAS], "native") + unit(4, "pt"),
+        default.units = "native", just = "center", hjust = c(6, 8.3),
+        gp = gpar(fontsize = 16, col = "#404040"))
+})
+dev.off()
+
+
+
+
+```
+
+
+```{r Pathway - NK12}
+Human = BiocManager::install("org.Hs.eg.db")
+### Stage I vs Stage IV
+head(rownames(results_NK05))
+m1 <- do.call(rbind, strsplit(rownames(results_NK05), split="_", fixed = TRUE))
+head(m1[,1])
+rownames(results_NK05) = m1[,1]
+# results_NK05['geneName'] <- m1[,2]
+# results_NK05 = results_NK05[,c(6, 1, 2, 3, 4, 5)]
+head(results_NK05)
+# m2 <- do.call(rbind, strsplit(m1[,2], split="_", fixed = TRUE))
+# results_NK05['geneName'] <- m2[,2]
+colnames(results_NK05)
+
+NK12_EntrezIDs = gconvert(row.names(results_NK05), organism = "hsapiens", target = "ENTREZGENE_ACC", filter_na = F, mthreshold = 1)
+write.csv(as.data.frame(NK12_EntrezIDs), file = "NK12_EntrezIDs.csv")
+
+NKI_NK2_EntrezIDs = read.csv("NK1_NK2_EntrezIDs.csv", sep = ",")
+head(NKI_NK2_EntrezIDs)
+dim(NKI_NK2_EntrezIDs)
+# NKI_NK2_EntrezIDs = NKI_NK2_EntrezIDs[!grepl("None", NKI_NK2_EntrezIDs$Entrez_ID),]
+NKI_NK2_EntrezIDs = NKI_NK2_EntrezIDs[!is.na(NKI_NK2_EntrezIDs$EntrezID),]
+dim(NKI_NK2_EntrezIDs)
+NKI_NK2_Genelist = NKI_NK2_EntrezIDs[,5]
+names(NKI_NK2_Genelist) = as.character(NKI_NK2_EntrezIDs[,2])
+NKI_NK2_Genelist = sort(NKI_NK2_Genelist, decreasing = TRUE)
+head(NKI_NK2_Genelist)
+length(NKI_NK2_Genelist)
+# # define DEG as having logFC of 1.5
+# NKI_NK2_GENE = names(NKI_NK2_Genelist)[abs(NKI_NK2_Genelist) > 1.5]
+NKI_NK2_GENE = names(NKI_NK2_Genelist)
+head(NKI_NK2_GENE)
+length(NKI_NK2_GENE)
+
+## ORA
+# KEGG
+ALL_NKI_NK2_KEGG_ORA = enrichKEGG(gene = NKI_NK2_GENE, organism = "hsa", pvalueCutoff = 0.05)
+head(ALL_NKI_NK2_KEGG_ORA)
+
+# translate gene IDs to gene symbols
+ALL_NKI_NK2_ORA_KEGG = setReadable(ALL_NKI_NK2_KEGG_ORA, OrgDb = Human, keyType = "ENTREZID")
+head(ALL_NKI_NK2_ORA_KEGG)
+tail(ALL_NKI_NK2_ORA_KEGG)
+# ALL_NKI_NK2_ORA_KEGG@result[1:22,]
+ALL_NKI_NK2_ORA_KEGG@result$Description[1:37]
+write.csv(as.data.frame(ALL_NKI_NK2_ORA_KEGG), file = "ALL_NKI_NK2_ORA_KEGG.csv")
+# highlight enriched genes
+# browseKEGG(ALL_NKI_NK2_KEGG_ORA, 'hsa04974')
+
+NKI_NK2_NKcytotox = pathview(gene.data = NKI_NK2_Genelist, pathway.id = 'hsa04650', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "NKI_NK2_NKcytotox")
+NKI_NK2_PD1PDL1 = pathview(gene.data = NKI_NK2_Genelist, pathway.id = 'hsa05235', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "NKI_NK2_PD1PDL1")
+NKI_NK2_APP = pathview(gene.data = NKI_NK2_Genelist, pathway.id = 'hsa04612', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "NKI_NK2_APP")
+NKI_NK2_TCR = pathview(gene.data = NKI_NK2_Genelist, pathway.id = 'hsa04660', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "NKI_NK2_TCR")
+NKI_NK2_CHEMOKINE = pathview(gene.data = NKI_NK2_Genelist, pathway.id = 'hsa04062', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "NKI_NK2_CHEMOKINE")
+
+
+
+# GeneConcept Network plot
+# NKI_NK2_ORA_KEGG_cnet <- cnetplot(ALL_NKI_NK2_ORA_KEGG, foldChange=NKI_NK2_Genelist)
+NKI_NK2_ORA_KEGG_cnet_tcell = cnetplot(ALL_NKI_NK2_ORA_KEGG, foldChange=NKI_NK2_Genelist, showCategory = ALL_NKI_NK2_ORA_KEGG@result$Description[c(2, 4, 19)], colorEdge = T, node_label = "category")
+pdf("NKI_NK2_ORA_KEGG_cnet_tcell.pdf")
+NKI_NK2_ORA_KEGG_cnet_tcell
+dev.off()
+
+NKI_NK2_ORA_KEGG_cnet_IMMUNE = cnetplot(ALL_NKI_NK2_ORA_KEGG, foldChange=NKI_NK2_Genelist, showCategory = ALL_NKI_NK2_ORA_KEGG@result$Description[c(2,4,19,5,23)], colorEdge = T, node_label = "gene")
+pdf("ALL_NKI_NK2_IMMUNE_CNETPLOT.pdf")
+NKI_NK2_ORA_KEGG_cnet_IMMUNE
+dev.off()
+
+
+NKI_NK2_ORA_KEGG_cnet_NK = cnetplot(ALL_NKI_NK2_ORA_KEGG, foldChange=NKI_NK2_Genelist, showCategory = ALL_NKI_NK2_ORA_KEGG@result$Description[c(19,5,23)], colorEdge = T, node_label = "gene")
+pdf("ALL_NKI_NK2_NK_CNETPLOT.pdf")
+NKI_NK2_ORA_KEGG_cnet_NK
+dev.off()
+
+
+
+# GO BP
+NKI_NK2_GO_ORA = enrichGO(gene = NKI_NK2_GENE, OrgDb = Human, ont = "BP", pvalueCutoff = 0.05, readable = TRUE)
+head(NKI_NK2_GO_ORA)
+write.csv(as.data.frame(NKI_NK2_GO_ORA), file = "ALL_NKI_NK2_GO_ORA.csv")
+
+
+# GSEA
+ALL_NKI_NK2_KEGG_GSEA = gseKEGG(geneList = NKI_NK2_Genelist, organism = "hsa", nPerm = 1000, pvalueCutoff = 0.05, keyType = "ncbi-geneid")
+head(ALL_NKI_NK2_KEGG_GSEA)
+ALL_NKI_NK2_KEGG_GSEA = setReadable(ALL_NKI_NK2_KEGG_GSEA, OrgDb = Human, keyType = "ENTREZID")
+head(ALL_NKI_NK2_KEGG_GSEA)
+write.csv(as.data.frame(ALL_NKI_NK2_KEGG_GSEA), file = "ALL_NKI_NK2_KEGG_GSEA.csv")
+
+# GO BP
+NKI_NK2_GO_GSEA = gseGO(geneList = NKI_NK2_Genelist, OrgDb = Human, ont = "BP", nPerm = 1000, minGSSize = 5, maxGSSize = 7000, pvalueCutoff = 0.05)
+head(NKI_NK2_GO_GSEA)
+
+
+#dotplot of enrichment terms
+# ORA_dot_ALL_NKI_NK2 = enrichplot::dotplot(ALL_NKI_NK2_KEGG_ORA, showCategory=20) + ggtitle("dotplot for ORA", subtitle = "Nar vs HD: NKI_NK2 subset")
+enrichplot::dotplot(ALL_NKI_NK2_KEGG_ORA, showCategory=ALL_NKI_NK2_ORA_KEGG@result$Description[c(2,4,5,10,11,19,23,24,34,36)], font.size = 15)
+
+ORA_dot_ALL_NKI_NK2 = enrichplot::dotplot(ALL_NKI_NK2_KEGG_ORA, showCategory=37, font.size = 8)
+pdf("ALL_NKI_NK2_ORA_KEGG.pdf")
+ORA_dot_ALL_NKI_NK2
+dev.off()
+
+ORAGO_dot_ALL_NKI_NK2 = enrichplot::dotplot(NKI_NK2_GO_ORA, showCategory=5, font.size = 15)
+pdf("ALL_NKI_NK2_ORA_GO.pdf")
+ORAGO_dot_ALL_NKI_NK2
+dev.off()
+
+
+
+# GSEA_dot_ALL_NKI_NK2 = dotplot(ALL_NKI_NK2_KEGG_GSEA, showCategory=20, font.size=10)
+# pdf("ALL_NKI_NK2_LONG_GSEA_KEGG.pdf")
+# GSEA_dot_ALL_NKI_NK2
+# dev.off()
+
+# png("ALL_NKI_NK2_dotplot_KEGG.png")
+# plot_grid(ORA_dot_ALL_NKI_NK2, GSEA_dot_ALL_NKI_NK2, ncol = 2)
+# dev.off()
+
+```
+
+```{r Pathway - FEMALE stage I vs IV}
+### FEMALE Stage I vs Stage IV
+head(rownames(resultsFEM))
+m1 <- do.call(rbind, strsplit(rownames(resultsFEM), split="_", fixed = TRUE))
+head(m1[,1])
+rownames(resultsFEM) = m1[,1]
+head(rownames(resultsFEM))
+FEMALEstageIIV_EntrezIDs = gconvert(row.names(resultsFEM), organism = "hsapiens", target = "ENTREZGENE_ACC", filter_na = F, mthreshold = 1)
+write.csv(as.data.frame(FEMALEstageIIV_EntrezIDs), file = "FEMALEstageIIV_EntrezIDs.csv")
+
+FEMALEstageIIV_EntrezIDs = read.csv("FEMALE_StageI_StageIV_EntrezID.csv", sep = ",")
+head(FEMALEstageIIV_EntrezIDs)
+dim(FEMALEstageIIV_EntrezIDs)
+# FEMALEstageIIV_EntrezIDs = FEMALEstageIIV_EntrezIDs[!grepl("NA", FEMALEstageIIV_EntrezIDs$EntrezID),]
+FEMALEstageIIV_EntrezIDs = FEMALEstageIIV_EntrezIDs[!is.na(FEMALEstageIIV_EntrezIDs$EntrezID),]
+dim(FEMALEstageIIV_EntrezIDs)
+FEMALEstageIIV_Genelist = FEMALEstageIIV_EntrezIDs[,5]
+names(FEMALEstageIIV_Genelist) = as.character(FEMALEstageIIV_EntrezIDs[,3])
+FEMALEstageIIV_Genelist = sort(FEMALEstageIIV_Genelist, decreasing = TRUE)
+head(FEMALEstageIIV_Genelist)
+length(FEMALEstageIIV_Genelist)
+# # define DEG as having logFC of 1.5
+# FEMALEstageIIV_GENE = names(FEMALEstageIIV_Genelist)[abs(FEMALEstageIIV_Genelist) > 1.5]
+FEMALEstageIIV_GENE = names(FEMALEstageIIV_Genelist)
+head(FEMALEstageIIV_GENE)
+length(FEMALEstageIIV_GENE)
+
+## ORA
+# KEGG
+FEMALEstageIIV_KEGG_ORA = enrichKEGG(gene = FEMALEstageIIV_GENE, organism = "hsa", pvalueCutoff = 0.05)
+head(FEMALEstageIIV_KEGG_ORA)
+
+# translate gene IDs to gene symbols
+FEMALEstageIIV_ORA_KEGG = setReadable(FEMALEstageIIV_KEGG_ORA, OrgDb = Human, keyType = "ENTREZID")
+head(FEMALEstageIIV_ORA_KEGG, 17)
+tail(FEMALEstageIIV_ORA_KEGG)
+# FEMALEstageIIV_ORA_KEGG@result[1:35,]
+FEMALEstageIIV_ORA_KEGG@result$Description[1:17]
+write.csv(as.data.frame(FEMALEstageIIV_ORA_KEGG), file = "FEMALEstageIIV_ORA_KEGG.csv")
+# highlight enriched genes
+# browseKEGG(FEMALEstageIIV_KEGG_ORA, 'hsa05235')
+
+FEMALEstageIIV_TNF = pathview(gene.data = FEMALEstageIIV_Genelist, pathway.id = 'hsa04668', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "FEMALEstageIIV_TNF")
+FEMALEstageIIV_Th17 = pathview(gene.data = FEMALEstageIIV_Genelist, pathway.id = 'hsa04659', species = "hsa", limit = list(gene=3, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "FEMALEstageIIV_Th17")
+FEMALEstageIIV_HPV = pathview(gene.data = FEMALEstageIIV_Genelist, pathway.id = 'hsa05165', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "FEMALEstageIIV_HPV")
+FEMALEstageIIV_NSCLC = pathview(gene.data = FEMALEstageIIV_Genelist, pathway.id = 'hsa05223', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "FEMALEstageIIV_NSCLC")
+# FEMALEstageIIV_Senes = pathview(gene.data = FEMALEstageIIV_Genelist, pathway.id = 'hsa04218', species = "hsa", limit = list(gene=5, cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "FEMALEstageIIV_Senes")
+# FEMALEstageIIV_GP = pathview(gene.data = FEMALEstageIIV_Genelist, pathway.id = 'hsa05205', species = "hsa", limit = list(gene=max(abs(FEMALEstageIIV_Genelist)), cpd=1), low = list(gene="purple", cpd = "blue"), high = list(gene="orange", cpd = "yellow"), out.suffix = "FEMALEstageIIV_GP")
+
+
+# GeneConcept Network plot
+# FEMALEstageIIV_ORA_KEGG_cnet <- cnetplot(FEMALEstageIIV_ORA_KEGG, foldChange=FEMALEstageIIV_Genelist)
+FEMALEstageIIV_ORA_KEGG_cnet_PATHO = cnetplot(FEMALEstageIIV_ORA_KEGG, foldChange=FEMALEstageIIV_Genelist, showCategory = FEMALEstageIIV_ORA_KEGG@result$Description[c(3, 8, 9, 10, 15)], colorEdge = T, node_label = "category")
+pdf("FEMALEstageIIV_PATHO_CNETPLOT.pdf")
+FEMALEstageIIV_ORA_KEGG_cnet_PATHO
+dev.off()
+
+FEMALEstageIIV_ORA_KEGG_cnet_Immune = cnetplot(FEMALEstageIIV_ORA_KEGG, foldChange=FEMALEstageIIV_Genelist, showCategory = FEMALEstageIIV_ORA_KEGG@result$Description[c(1, 7, 16)], colorEdge = T, node_label = "category")
+pdf("FEMALEstageIIV_Immune_CNETPLOT.pdf")
+FEMALEstageIIV_ORA_KEGG_cnet_Immune
+dev.off()
+
+
+# GO BP
+FEMALEstageIIV_GO_ORA = enrichGO(gene = FEMALEstageIIV_GENE, OrgDb = Human, ont = "BP", pvalueCutoff = 0.05, readable = TRUE)
+head(FEMALEstageIIV_GO_ORA)
+write.csv(as.data.frame(FEMALEstageIIV_GO_ORA), file = "FEMALEstageIIV_GO_ORA.csv")
+
+
+# GSEA
+FEMALEstageIIV_KEGG_GSEA = gseKEGG(geneList = FEMALEstageIIV_Genelist, organism = "hsa", nPerm = 1000, pvalueCutoff = 0.05, keyType = "ncbi-geneid")
+head(FEMALEstageIIV_KEGG_GSEA)
+# FEMALEstageIIV_KEGG_GSEA = setReadable(FEMALEstageIIV_KEGG_GSEA, OrgDb = Human, keyType = "ENTREZID")
+# head(FEMALEstageIIV_KEGG_GSEA)
+# write.csv(as.data.frame(FEMALEstageIIV_KEGG_GSEA), file = "FEMALEstageIIV_KEGG_GSEA.csv")
+
+# GO BP
+FEMALEstageIIV_GO_GSEA = gseGO(geneList = FEMALEstageIIV_Genelist, OrgDb = Human, ont = "BP", nPerm = 1000, minGSSize = 5, maxGSSize = 7000, pvalueCutoff = 0.05)
+head(FEMALEstageIIV_GO_GSEA)
+
+
+#dotplot of enrichment terms
+# ORA_dot_FEMALEstageIIV = enrichplot::dotplot(FEMALEstageIIV_KEGG_ORA, showCategory=20) + ggtitle("dotplot for ORA", subtitle = "Nar vs HD: FEMALEstageIIV subset")
+ORA_dot_FEMALEstageIIV = enrichplot::dotplot(FEMALEstageIIV_KEGG_ORA, showCategory=20, font.size = 15)
+pdf("FEMALEstageIIV_ORA_KEGG.pdf")
+ORA_dot_FEMALEstageIIV
+dev.off()
+
+ORAGO_dot_FEMALEstageIIV = enrichplot::dotplot(FEMALEstageIIV_GO_ORA, showCategory=20, font.size = 10)
+pdf("FEMALEstageIIV_ORA_GO.pdf")
+ORAGO_dot_FEMALEstageIIV
+dev.off()
+
+
+
+# GSEA_dot_FEMALEstageIIV = dotplot(FEMALEstageIIV_KEGG_GSEA, showCategory=20, font.size=10)
+# pdf("FEMALEstageIIV_LONG_GSEA_KEGG.pdf")
+# GSEA_dot_FEMALEstageIIV
+# dev.off()
+
+# png("FEMALEstageIIV_dotplot_KEGG.png")
+# plot_grid(ORA_dot_FEMALEstageIIV, GSEA_dot_FEMALEstageIIV, ncol = 2)
+# dev.off()
+
+```
+
+
+```{r HLA genes Heatmap }
+grep("HLA", rownames(assay(dds_NK)), perl = TRUE, value = TRUE)
+HLA_GENES = c("ENSG00000114455_HHLA2",  "ENSG00000132297_HHLA1",  "ENSG00000179344_HLA-DQB1", "ENSG00000181126_HLA-V", 
+"ENSG00000196126_HLA-DRB1", "ENSG00000196301_HLA-DRB9", "ENSG00000196735_HLA-DQA1", "ENSG00000197568_HHLA3", 
+"ENSG00000198502_HLA-DRB5", "ENSG00000204252_HLA-DOA", "ENSG00000204257_HLA-DMA", "ENSG00000204287_HLA-DRA", 
+"ENSG00000204525_HLA-C",  "ENSG00000204592_HLA-E",  "ENSG00000204622_HLA-J",  "ENSG00000204632_HLA-G", 
+"ENSG00000204642_HLA-F",  "ENSG00000206341_HLA-H",  "ENSG00000206503_HLA-A",  "ENSG00000214922_HLA-F-AS1", 
+"ENSG00000223534_HLA-DQB1-AS1", "ENSG00000223865_HLA-DPB1", "ENSG00000224372_HLA-N",  "ENSG00000224557_HLA-DPB2", 
+"ENSG00000225851_HLA-S",  "ENSG00000226030_HLA-DQB3", "ENSG00000226088_HHLA3-AS1", "ENSG00000228078_HLA-U", 
+"ENSG00000229391_HLA-DRB6", "ENSG00000230795_HLA-K",  "ENSG00000231130_HLA-T",  "ENSG00000231389_HLA-DPA1", 
+"ENSG00000231461_HLA-DPA2", "ENSG00000232629_HLA-DQB2", "ENSG00000234745_HLA-B",  "ENSG00000235290_HLA-W", 
+"ENSG00000235301_HLA-Z",  "ENSG00000237398_HLA-DPA3", "ENSG00000237541_HLA-DQA2", "ENSG00000241106_HLA-DOB", 
+"ENSG00000242574_HLA-DMB", "ENSG00000243753_HLA-L",  "ENSG00000261548_HLA-P") 
+
+HLA_dfINTER = as.data.frame(colData(dds_NK)[,c("NK_cluster", "Gender")])
+ORDERED_HLA_dfINTER = HLA_dfINTER[order(HLA_dfINTER$NK_cluster, HLA_dfINTER$Gender), ]
+HLA_vsd_INTER = varianceStabilizingTransformation(dds_NK, blind = FALSE)[HLA_GENES]
+(assay(HLA_vsd_INTER))
+ORDERED_HLA_vsd_INTER = HLA_vsd_INTER[, order(HLA_vsd_INTER$NK_cluster, HLA_vsd_INTER$Gender)]
+png("HLA_GENES_varStabTransHEATMAP.png")
+HLA_varStabTransHEATMAP_INTER = pheatmap(assay(ORDERED_HLA_vsd_INTER), cluster_rows = FALSE, show_rownames = TRUE, cluster_cols = FALSE, annotation_col = ORDERED_HLA_dfINTER)
+dev.off()
+```
+
+```{r KIR genes Heatmap}
+grep("KIR", rownames(assay(dds_NK)), perl = TRUE, value = TRUE)
+
+grep("NKG", rownames(assay(dds_NK)), perl = TRUE, value = TRUE)
+
+grep("KLR", rownames(assay(dds_NK)), perl = TRUE, value = TRUE)
+
+NK_GENES = c("ENSG00000104970_KIR3DX1", "ENSG00000125498_KIR2DL1", "ENSG00000126259_KIRREL2", 
+"ENSG00000149571_KIRREL3", "ENSG00000167633_KIR3DL1", 
+"ENSG00000183853_KIRREL1", "ENSG00000189013_KIR2DL4", "ENSG00000218109_KIRREL3-AS3",
+"ENSG00000221957_KIR2DS4", "ENSG00000226520_KIRREL1-IT1", "ENSG00000240403_KIR3DL2", 
+"ENSG00000242019_KIR3DL3", "ENSG00000242473_KIR2DP1", "ENSG00000243772_KIR2DL3",  
+"ENSG00000254960_KIRREL3-AS2", "ENSG00000257271_KIRREL3-AS1", "ENSG00000264257_KIR3DP1",  
+"ENSG00000111796_KLRB1",  "ENSG00000134539_KLRD1",  "ENSG00000134545_KLRC1",  "ENSG00000139187_KLRG1", 
+"ENSG00000150045_KLRF1", "ENSG00000183542_KLRC4", 
+"ENSG00000188883_KLRG2",  "ENSG00000205809_KLRC2",  "ENSG00000205810_KLRC3", 
+"ENSG00000213809_KLRK1",  "ENSG00000245648_KLRK1-AS1", "ENSG00000255819_KLRC4-KLRK1", "ENSG00000256667_KLRA1P", 
+"ENSG00000256797_KLRF2", "ENSG00000105374_NKG7")
+
+
+KIR_dfINTER = as.data.frame(colData(dds_NK)[,c("Gender", "NK_cluster")])
+ORDERED_KIR_dfINTER = KIR_dfINTER[order(KIR_dfINTER$NK_cluster, KIR_dfINTER$Gender), ]
+KIR_vsd_INTER = varianceStabilizingTransformation(dds_NK, blind = FALSE)[NK_GENES]
+(assay(KIR_vsd_INTER))
+ORDERED_KIR_vsd_INTER = KIR_vsd_INTER[, order(KIR_dfINTER$NK_cluster, KIR_dfINTER$Gender)]
+
+pdf("VISTA_KIR_GENES_varStabTransHEATMAP.pdf")
+KIR_varStabTransHEATMAP_INTER = pheatmap(assay(ORDERED_KIR_vsd_INTER), cluster_rows = T, show_rownames = TRUE, cluster_cols = F, annotation_col = ORDERED_KIR_dfINTER)
+dev.off()
+```
+
+
+
+
+
+
+

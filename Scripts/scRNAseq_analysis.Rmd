@@ -1,6 +1,6 @@
 ---
 title: "Single cell analysis"
-author: "Marcelo Hurtado"
+author: "Leila Khajavi and Marcelo Hurtado"
 date: "2023-07-10"
 output: html_document
 ---
@@ -12,6 +12,8 @@ library(SeuratDisk)
 library(patchwork)
 library(SingleR)
 library(celldex)
+library(ggplot2)
+set.seed(123)
 ```
 
 ```{r}
@@ -35,29 +37,45 @@ Cell annotations
 Annotated ct higher
 ```{r}
 Idents(seurat_anndata) = seurat_anndata@meta.data$annotated_ct_higher
+pdf("Results/UMAP_ct_higher", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction="umap", label = T)
+dev.off()
 ```
 
 Annotated ct
 ```{r}
 Idents(seurat_anndata) = seurat_anndata@meta.data$annotated_ct
+pdf("Results/UMAP_ct", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction="umap", label = T)
+dev.off()
 ```
 
 Score ct
 ```{r}
 Idents(seurat_anndata) = seurat_anndata@meta.data$scorect
+pdf("Results/UMAP_scorect", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction="umap", label = T)
+dev.off()
+```
+
+Assess batch effect
+```{r}
+Idents(seurat_anndata) = seurat_anndata@meta.data$sample
+pdf("Results/UMAP_batch", width = 8, height = 5)
+DimPlot(seurat_anndata, reduction="umap", label = F)
+dev.off()
 ```
 
 Cluster identification
 ```{r}
-DimPlot(seurat_anndata, reduction="umap")
 ElbowPlot(seurat_anndata) #determine dimensionality of data
 seurat_anndata = FindNeighbors(seurat_anndata, dims = 1:20)
 seurat_anndata = FindClusters(seurat_anndata, resolution = 1)
+pdf("Results/UMAP_clusters", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction="umap", label = T)
+dev.off()
 ```
+
 Cell annotation (ATLAS)
 ```{r}
 ref = celldex::HumanPrimaryCellAtlasData()
@@ -66,13 +84,14 @@ pred = SingleR(test = single_counts,
         ref = ref,
         labels = ref$label.main)
 seurat_anndata$singleR.labels = pred$labels[match(rownames(seurat_anndata@meta.data), rownames(pred))]
+pdf("Results/UMAP_HCA", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction = 'umap', group.by = 'singleR.labels')
+dev.off()
 head(pred$scores)
-plotScoreHeatmap(pred)
-plotDeltaDistribution(pred)
 tab = table(Assigned = pred$labels, Clusters = seurat_anndata$seurat_clusters)
+pdf("Results/Heatmap_HCA", width = 8, height = 5)
 pheatmap::pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
-Idents(seurat_anndata) = seurat_anndata@meta.data$singleR.labels #Rename clusters
+dev.off()
 ```
 
 Cell annotation (DatabaseImmuneCellExpressionData)
@@ -83,13 +102,14 @@ pred = SingleR(test = single_counts,
         ref = ref,
         labels = ref$label.main)
 seurat_anndata$singleR.labels = pred$labels[match(rownames(seurat_anndata@meta.data), rownames(pred))]
+pdf("Results/UMAP_ICE", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction = 'umap', group.by = 'singleR.labels')
+dev.off()
 head(pred$scores)
-plotScoreHeatmap(pred)
-plotDeltaDistribution(pred)
 tab = table(Assigned = pred$labels, Clusters = seurat_anndata$seurat_clusters)
+pdf("Results/Heatmap_ICE", width = 8, height = 5)
 pheatmap::pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
-Idents(seurat_anndata) = seurat_anndata@meta.data$singleR.labels #Rename clusters
+dev.off()
 ```
 
 Cell annotation (MonacoImmuneData)
@@ -100,13 +120,14 @@ pred = SingleR(test = single_counts,
         ref = ref,
         labels = ref$label.main)
 seurat_anndata$singleR.labels = pred$labels[match(rownames(seurat_anndata@meta.data), rownames(pred))]
+pdf("Results/UMAP_Monaco", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction = 'umap', group.by = 'singleR.labels')
+dev.off()
 head(pred$scores)
-plotScoreHeatmap(pred)
-plotDeltaDistribution(pred)
 tab = table(Assigned = pred$labels, Clusters = seurat_anndata$seurat_clusters)
+pdf("Results/Heatmap_Monaco", width = 8, height = 5)
 pheatmap::pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
-Idents(seurat_anndata) = seurat_anndata@meta.data$singleR.labels #Rename clusters
+dev.off()
 ```
 
 Cell annotation (BlueprintEncodeData)
@@ -117,165 +138,168 @@ pred = SingleR(test = single_counts,
         ref = ref,
         labels = ref$label.main)
 seurat_anndata$singleR.labels = pred$labels[match(rownames(seurat_anndata@meta.data), rownames(pred))]
+pdf("Results/UMAP_BPE", width = 8, height = 5)
 DimPlot(seurat_anndata, reduction = 'umap', group.by = 'singleR.labels')
+dev.off()
 head(pred$scores)
-plotScoreHeatmap(pred)
-plotDeltaDistribution(pred)
 tab = table(Assigned = pred$labels, Clusters = seurat_anndata$seurat_clusters)
+pdf("Results/Heatmap_BPE", width = 8, height = 5)
 pheatmap::pheatmap(log10(tab+10), color=colorRampPalette(c('white', 'blue'))(10))
-Idents(seurat_anndata) = seurat_anndata@meta.data$singleR.labels #Rename clusters
+dev.off()
 ```
-
-NK cluster annotation (2,6,8)
-```{r}
-NK268 = subset(seurat_anndata, idents = c("2", "6","8"), invert = FALSE)
-DimPlot(NK268, reduction="umap")
-
-#Re-clustering
-NK268 = FindNeighbors(NK268, dims = 1:20)
-NK268 = FindClusters(NK268, algorithm= 1, resolution = 0.1)
-NK268 <- RunUMAP(NK268, dims = 1:20)
-DimPlot(NK268, reduction="umap", label = T, pt.size = 0.5) 
-```
-Features NK
-```{r}
-featuresNK = c("GNLY", "KLRK1", "KLRC2", "KLRC3", "CD3E", "NCAM1", "FCGR3A", "CD226", "GZMA", "GZMB", "GZMH", "GZMK", "PRF1", "TNF", "IFNG", "IL7R",
-               "KLF2", "S1PR5", "ITGAE", "ZNF683")
-FeaturePlot(NK268, features = featuresNK)
-VlnPlot(NK268, features = featuresNK, log = T)
-```
-NK cluster annotation 8
+NK cluster annotation (8)
 ```{r}
 NK8 = subset(seurat_anndata, idents = "8", invert = FALSE)
 DimPlot(NK8, reduction="umap")
 
 #Re-clustering
 NK8 = FindNeighbors(NK8, dims = 1:20)
-NK8 = FindClusters(NK8, algorithm= 1, resolution = 0.1)
+NK8 = FindClusters(NK8, algorithm= 1, resolution = 0.2)
 NK8 <- RunUMAP(NK8, dims = 1:20)
-DimPlot(NK8, reduction="umap", label = T, pt.size = 0.5) 
-```
-Features
-```{r}
-VlnPlot(NK8, features = featuresNK, log = T)
-markers = FindMarkers(NK8, ident.1 = "0", ident.2 = "1")
-head(markers, n=20)
+pdf("Results/UMAP_NK", width = 8, height = 5)
+DimPlot(NK8, reduction="umap", label = T, pt.size = 0.5)
+dev.off()
 ```
 
-NK cluster annotation (6,8)
+Cluster features
 ```{r}
-NK68 = subset(seurat_anndata, idents = c("6","8"), invert = FALSE)
-DimPlot(NK68, reduction="umap")
+#All markers
+NK8.markersALL <- FindAllMarkers(NK8, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0.25)
+write.csv(NK8.markersALL, "Results/NK8_markerALL.csv")
 
-#Re-clustering
-NK68 = FindNeighbors(NK68, dims = 1:20)
-NK68 = FindClusters(NK68, algorithm= 1, resolution = 0.1)
-NK68 <- RunUMAP(NK68, dims = 1:20)
-DimPlot(NK68, reduction="umap", label = T, pt.size = 0.5) 
-```
-Features
-```{r}
-VlnPlot(NK68, features = featuresNK, log = T)
-markers = FindMarkers(NK68, ident.1 = "0", ident.2 = "1")
-head(markers, n=20)
-```
-NK cluster based on public annotation 
-```{r}
-Idents(seurat_anndata) = seurat_anndata@meta.data$annotated_ct
-NK = subset(seurat_anndata, idents = c("NK cells"), invert = FALSE)
-DimPlot(NK, reduction="umap")
+#Differential markers
+NK8.markers01 <- FindMarkers(NK8, ident.1 = "0", ident.2 = "1")
+head(NK8.markers01, 10)
+write.csv(NK8.markers01, "Results/NK8.markers01.csv")
 
-#Re-clustering
-NK = FindNeighbors(NK, dims = 1:20)
-NK = FindClusters(NK, algorithm= 1, resolution = 0.1)
-NK <- RunUMAP(NK, dims = 1:20)
-DimPlot(NK, reduction="umap", label = T, pt.size = 0.5) 
-```
-Features
-```{r}
-VlnPlot(NK, features = featuresNK, log = T)
-markers = FindMarkers(NK, ident.1 = "0", ident.2 = "1")
-head(markers, n=20)
+NK8.markers02 <- FindMarkers(NK8, ident.1 = "0", ident.2 = "2")
+head(NK8.markers02, 10)
+write.csv(NK8.markers02, "Results/NK8.markers02.csv")
+
+NK8.markers12 <- FindMarkers(NK8, ident.1 = "1", ident.2 = "2")
+head(NK8.markers12, 10)
+write.csv(NK8.markers12, "Results/NK8.markers12.csv")
 ```
 
-Cell proportions 
+Features NK
 ```{r}
-library(dplyr)
-library(tibble)
-subcluster = NK
-total = list()
-patients = levels(subcluster@meta.data$sample)
+featuresNK = c("GNLY", "KLRK1", "KLRC2", "KLRC3", "CD3E", "NCAM1", "FCGR3A", "CD226", "GZMA", "GZMB", "GZMH", "GZMK", "PRF1", "TNF", "IFNG", "IL7R",
+               "KLF2", "S1PR5", "ITGAE", "ZNF683")
 
-for (i in 1:length(patients)) {
-  total[[i]] = subcluster@meta.data %>%
-    filter(sample %in% patients[i])
-}
-names(total) = patients
+pdf("Results/FeaturePlot_NK", width = 10, height = 8)
+FeaturePlot(NK8, features = featuresNK, ncol = 5)
+dev.off()
 
-cell_types = levels(subcluster)
-cells = list()
-counts = c()
-for (i in 1:length(total)) {
-  for (j in 1:length(cell_types)) {
-    data = total[[i]] %>%
-      filter(seurat_clusters %in% cell_types[j])
-    counts = c(counts, nrow(data))
-  }
-  counts = as.vector(counts)
-  names(counts) = cell_types
-  cells[[i]] = counts
-  counts = c()
-}
-names(cells) = patients
-
-proportions = list()
-ratio = c()
-for (i in 1:length(cells)) {
-  for (j in cell_types) {
-    ratio = c(ratio, round(cells[[i]][[j]]/nrow(total[[i]]), 6))
-  }
-  ratio = as.vector(ratio)
-  names(ratio) = cell_types
-  proportions[[i]] = ratio
-  ratio = c()
-}
-names(proportions) = patients
+pdf("Results/ViolinPlot_NK", width = 15, height = 8)
+VlnPlot(NK8, features = featuresNK, log = T, ncol = 5)
+dev.off()
 ```
 
-Check samples that have both single cell and bulk data
+Annotate NK cells
 ```{r}
-levels(seurat_anndata@meta.data$sample)
+new.cluster.ids <- c("Peripheral", "Dysfunctional", "Tissue-resident")
+names(new.cluster.ids) <- levels(NK8)
+NK8 <- RenameIdents(NK8, new.cluster.ids)
+pdf("Results/UMAP_NK_annotated", width = 8, height = 5)
+DimPlot(NK8, reduction = "umap", label = TRUE, pt.size = 1) + NoLegend()
+dev.off()
+```
+
+UMAP of NK based on patients
+```{r}
+NK8$NKclust = Idents(NK8)
+Idents(NK8) = NK8@meta.data$sample
+pdf("Results/UMAP_NK_patients.pdf", width = 8, height = 5)
+DimPlot(NK8, reduction = "umap")
+dev.off()
+```
+
+Cell proportions
+```{r color UMAP by patients}
+Idents(NK8) = "NKclust"
+table(Idents(NK8)) # how many cells in each cluster
+table(NK8$sample) # how many cells per patient
+table(Idents(NK8), NK8$sample) # how many cells per patient in each cluster
+NKClustTable = table(Idents(NK8), NK8$sample) #Create data frame with number of cells per patient in each cluster
+NKClustPercPat = prop.table(table(Idents(NK8), NK8$sample), margin = 2) #Create data frame with proportion of cells per patient in each cluster
+
+#Create data frame with proportions
+NKClustPercPat = data.frame(NKClustPercPat)
+colnames(NKClustPercPat) = c("NK_Cluster", "PatientID", "CellProportion")
+
+#Match with samples ID used in Vanderbilt analysis
 clinical.data <- data.frame(read.csv("~/Documents/LungPredict1_complete/RawFiles/ColumnData_Vanderbilt.csv", row.names = 1))
-clinical.data <- clinical.data[,c(1,5,6,9,11,13)]
+clinical.data = clinical.data[clinical.data$pt_ID%in%NKClustPercPat$PatientID,]
+samples = clinical.data$pt_ID
+names(samples) = rownames(clinical.data)
 
-coldata = clinical.data[clinical.data$pt_ID%in%levels(seurat_anndata@meta.data$sample),]
-
-#14958 14965 11817 13634 15467 12929  8356 12889 15002
-#"R3388_YZ_1"  "R3388_YZ_2"  "R3388_YZ_10" "R3388_YZ_11" "R3388_YZ_18" "R3388_YZ_28" "R3388_YZ_56" "R4163_YZ_16" "R4163_YZ_25"
-```
-
-Plot cell proportions
-```{r}
-library(ggplot2)
-##Prepare data
-data = list()
-for (i in 1:length(proportions)){
-  data[[i]] = data.frame("Sample" = rep(names(proportions)[i], length(cell_types)),
-                    "Cells_types" = cell_types,
-                    "Value" = unname(proportions[[i]]))}
-data = bind_rows(data)
-
-data$Patient = data$Sample
-for (i in 1:nrow(data)) {
-  idx = which(coldata$pt_ID %in% data$Sample[i])
+NKClustPercPat$Samples = as.character(NKClustPercPat$PatientID)
+for (i in 1:nrow(NKClustPercPat)) {
+  idx = which(samples == NKClustPercPat$PatientID[i])
   if(length(idx)>0){
-    data$Patient[i] = rownames(coldata)[idx]
+    NKClustPercPat$Samples[i] = names(samples)[idx]
   }
 }
 
-p1 = ggplot(data) +
-  geom_bar(aes(x = Patient, y = Value, fill = Cells_types), 
-           position = "stack", stat = "identity")
-p1
+for (j in seq(1,nrow(NKClustPercPat),3)) {
+  idx = which.max(NKClustPercPat$CellProportion[j:(j+2)])
+  NKClustPercPat$Level[j:(j+2)] = as.character(NKClustPercPat$NK_Cluster[idx])
+}
 
+NKClustPat = ggplot(data = NKClustPercPat, aes(x=Samples, y=CellProportion, fill=NK_Cluster, label = CellProportion)) +
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+pdf("Results/Barplot_NK_Cluster.pdf", width = 10, height = 5)
+NKClustPat
+dev.off()
 ```
+
+BayesPrism
+
+Annotation of scRNAseq
+```{r}
+seurat_anndata@meta.data$new_annotation = as.character(seurat_anndata@meta.data$annotated_ct)
+
+##NK cells
+dysfunctional = rownames(NK8@meta.data)[which(Idents(NK8) == "Dysfunctional")]
+tissue_resident = rownames(NK8@meta.data)[which(Idents(NK8) == "Tissue-resident")]
+peripheral = rownames(NK8@meta.data)[which(Idents(NK8) == "Peripheral")]
+
+seurat_anndata@meta.data$new_annotation[which(rownames(seurat_anndata@meta.data) %in% dysfunctional)] = "Dysfunctional"
+seurat_anndata@meta.data$new_annotation[which(rownames(seurat_anndata@meta.data) %in% tissue_resident)] = "Tissue-resident"
+seurat_anndata@meta.data$new_annotation[which(rownames(seurat_anndata@meta.data) %in% peripheral)] = "Peripheral"
+
+#Remove NK cells not identified as any of the other subtypes
+nk_other = colnames(seurat_anndata)[which(seurat_anndata@meta.data$new_annotation %in% "NK cells")]
+seurat_anndata <- subset(seurat_anndata, cells = setdiff(Cells(seurat_anndata), nk_other))
+
+seurat_anndata@meta.data$new_annotation = as.factor(seurat_anndata@meta.data$new_annotation)
+Idents(seurat_anndata) = seurat_anndata@meta.data$new_annotation
+
+DimPlot(seurat_anndata, reduction="umap", label = T, pt.size = 1)
+```
+
+Import bulk data
+```{r}
+load("~/Documents/CellTFusion/user_projects/LP_early_results.RData")
+bulk_gene_expression = counts
+```
+
+BayesPrism
+```{r}
+library(BayesPrism)
+
+counts.matrix <- as.matrix(seurat_anndata@assays$RNA@counts)
+cell.type.annotations <- Idents(seurat_anndata)
+
+deconvolution.results.bayesprism <- deconvolute(bulk_gene_expression = bulk_gene_expression,
+                                           single_cell_object = counts.matrix,
+                                           cell_type_annotations = cell.type.annotations,
+                                           signature=NULL,
+                                           method = 'bayesprism', 
+                                           n_cores=12)
+
+omnideconv::plot_deconvolution(list('bayesprism' = deconvolution.results.bayesprism), "bar", "method", "Spectral")
+```
+
